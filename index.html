@@ -15,10 +15,10 @@
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Birim Fiyat Takip & Endeksleme Paneli</h1>
-                <p class="text-sm text-slate-400 mt-1">Sözleşme fiyatlarını ve birimleri Excel'den otomatik okur, TCMB kuruyla endeksler.</p>
+                <p class="text-sm text-slate-400 mt-1">Sözleşme fiyatlarını ve birimleri Excel'den otomatik okur,詳CMB kuruyla endeksler.</p>
             </div>
             <div id="connection-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Sistem Hazır
+                Sistem Aktif
             </div>
         </div>
 
@@ -45,13 +45,15 @@
 
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-between md:col-span-2">
                 <div>
-                    <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">2. Keşif Dosyası Yükle (Değişiklik Yapmadan)</h2>
-                    <p class="text-xs text-slate-400 mt-2">Yüklediğiniz tablodaki <b>POZ NO, İMALAT ADI, BİRİMİ (m², mt, kg vb.), MİKTARI</b> ve <b>B. FİYAT</b> sütunları yazılımla otomatik ayrıştırılır.</p>
+                    <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">2. Keşif Dosyası Yükle</h2>
+                    <p class="text-xs text-slate-400 mt-2">Mevcut şablonunuzdaki sütunlar (POZ NO, İMALAT ADI, BİRİMİ, MİKTARI, B. FİYAT) otomatik algılanır.</p>
                 </div>
-                <div class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center bg-slate-900/50 hover:border-amber-500 transition-colors mt-4 cursor-pointer relative">
+                
+                <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center bg-slate-900/50 hover:border-amber-500 transition-colors mt-4 relative">
                     <input type="file" id="excel_file" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(event)">
-                    <p id="file-label" class="text-sm font-medium text-slate-300">Keşif Excel dosyasını seçin veya buraya sürükleyin</p>
+                    <p id="file-label" class="text-sm font-medium text-slate-300">Keşif Excel dosyasını buraya sürükleyin veya tıklayıp seçin</p>
                 </div>
+                
                 <button onclick="processAndSaveData()" class="w-full mt-4 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 rounded-lg text-sm shadow-lg transition-colors">Verileri O Günkü Kurla Endeksle ve Kaydet</button>
             </div>
         </div>
@@ -70,141 +72,149 @@
     </div>
 
     <script>
-        // Supabase Bağlantı Ayarları (Sizin DB Bilgileriniz Gelecek)
+        // DIKKAT: Buraya Supabase adresinizi ve Anon şifrenizi girin!
         const SUPABASE_URL = "https://supabase.com/dashboard/project/irigxievakecirilcioz/settings/api-keys";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyaWd4aWV2YWtlY2lyaWxjaW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NDcwODAsImV4cCI6MjA5NjIyMzA4MH0.bYb5RhyWIzfqNlnLw5B9RJwvgJVbFOQHL5_hh2rGB74";
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Çökmeyi engelleyen isim düzeltmesi yapıldı
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let parsedExcelData = [];
         let chartInstance = null;
 
-        // Excel Okuma Fonksiyonu (Sizin şablonunuza göre optimize edildi)
+        // Sürükle bırak görsel efektleri için sensörler
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-amber-500'); });
+        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-amber-500'); });
+        dropZone.addEventListener('drop', () => { dropZone.classList.remove('border-amber-500'); });
+
+        // Geliştirilmiş Akıllı Excel Okuma Fonksiyonu
         function handleFileSelect(event) {
-            const file = event.target.files[0];
-            document.getElementById('file-label').innerText = file.name + " yüklendi.";
+            const file = event.target.files[0] || event.dataTransfer.files[0];
+            if (!file) return;
+            
+            document.getElementById('file-label').innerText = file.name + " okundu. İşlenmeye hazır.";
             
             const reader = new FileReader();
             reader.onload = function(e) {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, {type: 'array'});
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                
-                // Excel'i satır satır JSON dizisine çeviriyoruz
                 const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
                 
+                // Hücrelerdeki boşlukları ve noktaları temizleyip bilgisayarın kolayca bulmasını sağlayan yardımcı fonksiyon
+                const cleanText = (str) => String(str || '').toLowerCase().replace(/[\s\.\-_]/g, '');
+
                 let headerIndex = -1;
-                // Sizin tablonuzdaki başlık satırını tarayarak buluyoruz
                 for(let i=0; i<rows.length; i++) {
-                    if(rows[i].includes("POZ NO") || rows[i].includes("POZ")) {
+                    // Satırda POZ NO sütununu arıyoruz
+                    if(rows[i].some(cell => cleanText(cell).includes("pozno") || cleanText(cell) === "poz")) {
                         headerIndex = i;
                         break;
                     }
                 }
 
                 if(headerIndex === -1) {
-                    alert("HATA: Yüklenen dosyada 'POZ NO' sütun başlığı bulunamadı!");
+                    alert("HATA: Excel dosyasında 'POZ NO' veya 'POZ' sütun başlığı algılanamadı! Lütfen kontrol edin.");
                     return;
                 }
 
-                const headers = rows[headerIndex];
+                const headers = rows[headerIndex].map(h => cleanText(h));
                 parsedExcelData = [];
 
-                // Başlıkların sütun numaralarını dinamik yakalıyoruz (Sırası değişse de sistem bulur)
-                const pozIdx = headers.indexOf("POZ NO");
-                const adiIdx = headers.indexOf("İMALAT ADI");
-                const birimIdx = headers.indexOf("BİRİMİ");
-                const miktarIdx = headers.indexOf("MİKTARI");
-                const fiyatIdx = headers.indexOf("B. FİYAT");
+                // Akıllı Sütun Eşleştirme (Boşluklu veya boşluksuz olsa da otomatik yakalar)
+                const pozIdx = headers.findIndex(h => h.includes("poz"));
+                const adiIdx = headers.findIndex(h => h.includes("imalatadi") || h.includes("adi") || h.includes("aciklama"));
+                const birimIdx = headers.findIndex(h => h.includes("birim"));
+                const miktarIdx = headers.findIndex(h => h.includes("miktar"));
+                const fiyatIdx = headers.findIndex(h => h === "bfiyat" || h === "birimfiyat" || h.includes("fiyat"));
 
-                // Verileri döngüyle temizleyip alıyoruz
                 for(let j = headerIndex + 1; j < rows.length; j++) {
                     const row = rows[j];
                     if(row[pozIdx] && row[fiyatIdx]) {
                         parsedExcelData.push({
                             item_code: String(row[pozIdx]).trim(),
                             item_name: String(row[adiIdx] || '').trim(),
-                            unit: String(row[birimIdx] || 'm²').trim(), // Birim bilgisi burada yakalanıyor
-                            quantity: parseFloat(row[miktarIdx]) || 0,
-                            unit_price_tl: parseFloat(row[fiyatIdx]) || 0
+                            unit: String(row[birimIdx] || 'm²').trim(),
+                            quantity: parseFloat(String(row[miktarIdx]).replace(',','.')) || 0,
+                            unit_price_tl: parseFloat(String(row[fiyatIdx]).replace(',','.')) || 0
                         });
                     }
                 }
-                alert(parsedExcelData.length + " adet imalat kalemi başarıyla okundu!");
+                alert("Başarılı: " + parsedExcelData.length + " adet imalat kalemi Excel'den otomatik ayrıştırıldı!");
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // Veritabanına Kaydetme ve O Günün Kuruyla Eşleme Mekanizması
+        // Veritabanına Sorunsuz Kaydetme Fonksiyonu
         async function processAndSaveData() {
-            const projName = document.getElementById('project_name').value;
-            const compName = document.getElementById('company_name').value;
+            const projName = document.getElementById('project_name').value.trim();
+            const compName = document.getElementById('company_name').value.trim();
             const effDate = document.getElementById('effective_date').value;
-            const revNote = document.getElementById('revision_note').value;
+            const revNote = document.getElementById('revision_note').value.trim();
 
             if(!projName || !compName || !effDate || parsedExcelData.length === 0) {
-                alert("Lütfen tüm alanları doldurun ve Excel yüklediğinizden emin olun!");
+                alert("Lütfen eksik alanları doldurun ve önce geçerli bir Excel dosyası yükleyin!");
                 return;
             }
 
-            // 1. Projeyi kaydet veya id'sini al
-            let { data: project } = await supabase.from('projects').select('id').eq('project_name', projName).maybeSingle();
+            // Proje Kaydı
+            let { data: project } = await supabaseClient.from('projects').select('id').eq('project_name', projName).maybeSingle();
             if(!project) {
-                const { data: newProj } = await supabase.from('projects').insert([{ project_name: projName }]).select().single();
+                const { data: newProj } = await supabaseClient.from('projects').insert([{ project_name: projName }]).select().single();
                 project = newProj;
             }
 
-            // 2. Firmayı kaydet veya id'sini al
-            let { data: company } = await supabase.from('companies').select('id').eq('company_name', compName).maybeSingle();
+            // Firma Kaydı
+            let { data: company } = await supabaseClient.from('companies').select('id').eq('company_name', compName).maybeSingle();
             if(!company) {
-                const { data: newComp } = await supabase.from('companies').insert([{ company_name: compName }]).select().single();
+                const { data: newComp } = await supabaseClient.from('companies').insert([{ company_name: compName }]).select().single();
                 company = newComp;
             }
 
-            // 3. Sözleşme başlığını aç
-            const { data: contract } = await supabase.from('contracts').insert([
+            // Sözleşme Başlığı
+            const { data: contract } = await supabaseClient.from('contracts').insert([
                 { project_id: project.id, company_id: company.id, contract_date: effDate }
             ]).select().single();
 
-            // 4. Kalemleri ve Birimleri ekle
+            // Kalemlerin Toplu Gönderimi
             const itemsToInsert = parsedExcelData.map(item => ({
                 contract_id: contract.id,
                 item_code: item.item_code,
                 item_name: item.item_name,
-                unit: item.unit, // Birim (m2, mt vb.) veritabanına gidiyor
+                unit: item.unit,
                 quantity: item.quantity,
                 unit_price_tl: item.unit_price_tl,
                 price_effective_date: effDate,
                 revision_note: revNote
             }));
 
-            const { error } = await supabase.from('contract_items').insert(itemsToInsert);
+            const { error } = await supabaseClient.from('contract_items').insert(itemsToInsert);
             if(error) {
-                alert("Veriler kaydedilirken bir hata oluştu: " + error.message);
+                alert("Supabase Kayıt Hatası: " + error.message);
             } else {
-                alert("Harika! Tüm imalat kalemleri, birimleri ve fiyatları o günkü kur endeksine işlendi.");
+                alert("Harika! Excel'deki tüm birimler ve fiyatlar başarıyla veritabanına işlendi ve endekslendi.");
             }
         }
 
-        // Grafikte Gösterme ve Tarihsel Analiz Fonksiyonu
+        // Tarihsel Grafik Analizi Fonksiyonu
         async function fetchPozHistory() {
-            const pozCode = document.getElementById('search_poz').value;
-            if(!pozCode) return alert("Lütfen bir poz kodu girin!");
+            const pozCode = document.getElementById('search_poz').value.trim();
+            if(!pozCode) return alert("Lütfen aramak istediğiniz poz kodunu girin!");
 
-            // Dinamik SQL View'ımızdan verileri süzüyoruz
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
                 .select('*')
                 .eq('item_code', pozCode)
                 .order('price_date', { ascending: true });
 
             if(error || !data || data.length === 0) {
-                alert("Bu poza ait geçmiş fiyat kaydı bulunamadı.");
+                alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.");
                 return;
             }
 
-            // Grafik Verilerini Hazırlıyoruz
             const labels = data.map(d => `${d.price_date} (${d.company_name})`);
-            const pricesTl = data.map(d => d.current_indexed_price_tl); // Bugünün parasıyla TL karşılığı
+            const pricesTl = data.map(d => d.current_indexed_price_tl);
 
             if (chartInstance) { chartInstance.destroy(); }
 
@@ -214,7 +224,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: `${pozCode} Pozunun Bugünün Dolar Kuruna Endeksli TL Değeri`,
+                        label: `${pozCode} Pozunun Güncel Dolar Kuruna Endeksli Karşılığı (TL)`,
                         data: pricesTl,
                         borderColor: '#f59e0b',
                         backgroundColor: 'rgba(245, 158, 11, 0.1)',
