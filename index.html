@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yapay Zeka Destekli Birim Fiyat Takip Sistemi</title>
-    <script src="[https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4](https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js](https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js)"></script>
-    <script src="[https://cdn.jsdelivr.net/npm/chart.js](https://cdn.jsdelivr.net/npm/chart.js)"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-6">
 
@@ -17,7 +17,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-slate-400 font-medium mb-1">Supabase URL</label>
-                    <input type="text" id="cfg_sb_url" placeholder="[https://xyz.supabase.co](https://xyz.supabase.co)" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white focus:outline-none">
+                    <input type="text" id="cfg_sb_url" placeholder="https://xyz.supabase.co" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-slate-400 font-medium mb-1">Supabase Anon Key</label>
@@ -217,18 +217,33 @@
             }
         }
 
+        // Akıllı Excel Okuma Motoru (Hücre ve Satır Düzenleyici)
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
-            printLog("Excel çözümleniyor: " + file.name, 'info');
+            printLog("Excel matrisi çözümleniyor: " + file.name, 'info');
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    rawExcelTextDump = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
-                    document.getElementById('file-status-text').innerText = file.name + " analize hazır.";
-                    printLog("Excel metin matrisine dönüştürüldü.", 'success');
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    // Excel tablosunu ham CSV yerine temiz satır dizilerine (Array of Arrays) bölüyoruz
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    
+                    let optimizedText = "";
+                    rows.forEach((row, index) => {
+                        // Tamamen boş satırları eleyerek token tasarrufu sağlıyoruz ve AI karmaşasını önlüyoruz
+                        if (row.length > 0 && row.some(cell => cell !== null && cell !== undefined && cell !== "")) {
+                            const cleanRowCells = row.map(cell => cell === null || cell === undefined ? "" : String(cell).trim());
+                            optimizedText += `Satır ${index + 1}: ${cleanRowCells.join(" | ")}\n`;
+                        }
+                    });
+                    
+                    rawExcelTextDump = optimizedText;
+                    document.getElementById('file-status-text').innerText = file.name + " optimize edildi, analize hazır.";
+                    printLog("Excel verisi AI için yapılandırılmış satır matrisine dönüştürüldü.", 'success');
                 } catch(err) {
                     printLog("Excel dönüştürme hatası: " + err.message, 'error');
                 }
@@ -262,26 +277,27 @@
             document.getElementById('ai-status').innerText = "AI Çözümlemede...";
             printLog("1/5: İstek paketi güvenli kanala ulaştırılıyor...", 'info');
 
-            const aiPrompt = `Aşağıdaki ham inşaat keşif metnindeki imalat satırlarını ayıkla. 
-            Bana tam olarak şu yapıda bir JSON objesi üret:
+            // Geliştirilmiş Mühendislik Odaklı Prompt Mühendisliği
+            const aiPrompt = `Aşağıda "Satır X: Hücre1 | Hücre2" formatında düzenlenmiş ham inşaat keşif metnindeki imalat satırlarını akıllıca analiz et.
+            Başlık satırlarını ve tamamen boş satırları atlayarak sadece geçerli imalat kalemlerini (poz kodu, imalat adı, birimi, miktarı ve birim fiyatı olanları) ayıkla.
+            
+            Bana tam olarak şu yapıda geçerli bir JSON objesi üret:
             {
               "items": [
                 {
-                  "item_code": "POZ NO DEĞERİ",
-                  "item_name": "İMALAT ADI AÇIKLAMASI",
-                  "unit": "BİRİMİ",
+                  "item_code": "POZ NUMARASI VEYA KODU (Örn: Y.23.014 veya ÖBF-1)",
+                  "item_name": "İMALAT ADI VE DETAYLI AÇIKLAMASI",
+                  "unit": "BİRİMİ (Örn: m², m³, kg, adet)",
                   "quantity": 100.50,
                   "unit_price_tl": 250.75
                 }
               ]
             }
-            Sadece objeyi döndür.\n\nHam Veri:\n${rawExcelTextDump}`;
+            Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama ekleme.\n\nHam Veri:\n${rawExcelTextDump}`;
 
             try {
                 printLog("2/5: Veriler Gemini v2.5 Flash tüneline aktarılıyor...", 'info');
                 
-                // Riskli generation_config parametreleri tamamen kaldırıldı. 
-                // Ağ geçidinin hata fırlatma ihtimali %0'a indirildi.
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`, {
                     method: 'POST',
                     headers: { 
@@ -301,14 +317,20 @@
 
                 const result = await response.json();
                 printLog("3/5: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
+                
                 let aiJsonResponseText = result.candidates[0].content.parts[0].text;
                 
-                // Aşağıdaki temizlik motoru gelen markdown etiketlerini her koşulda kusursuz temizler.
-                aiJsonResponseText = aiJsonResponseText.replace(/```json/gi, '').replace(/```/gi, '').trim();
+                // KURŞUN GEÇİRMEZ JSON AYIKLAMA MOTORU (Regex tabanlı)
+                // Gemini konuşma metni üretse bile sadece { ... } dışındaki tüm çöp karakterleri eler.
+                const jsonMatch = aiJsonResponseText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error("Yapay zeka yanıtından geçerli bir JSON veri ağacı çıkarılamadı.");
+                }
+                aiJsonResponseText = jsonMatch[0];
 
                 let parsedData = JSON.parse(aiJsonResponseText);
                 const parsedItems = parsedData.items || [];
-                if (parsedItems.length === 0) throw new Error("Yapay zeka geçerli bir imalat satırı bulamadı.");
+                if (parsedItems.length === 0) throw new Error("Yapay zeka şablonda geçerli bir imalat satırı bulamadı.");
 
                 printLog(`4/5: ${parsedItems.length} imalat kalemi filtrelendi. Supabase güvenli kayıt kanalı açılıyor...`, 'info');
 
@@ -372,7 +394,7 @@
                 if (iErr) throw new Error("Poz Kalemleri Toplu Kayıt Hatası: " + iErr.message);
 
                 printLog(`✓ İŞLEM TAMAMLANDI: ${parsedItems.length} adet poz başarıyla işlendi.`, 'success');
-                alert(`✓ BAŞARILI: Gemini 2.5 Flash Excel dosyasını mükemmel şekilde çözdü ve ${parsedItems.length} adet imalat kalemini veritabanınıza kaydetti.`);
+                alert(`✓ BAŞARILI: Gemini Excel verilerini kusursuz ayrıştırdı ve ${parsedItems.length} adet imalat kalemini veritabanınıza kaydetti.`);
                 
                 document.getElementById('excel_file').value = "";
                 rawExcelTextDump = "";
