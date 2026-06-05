@@ -112,7 +112,6 @@
         let rawExcelTextDump = "";
         let chartInstance = null;
 
-        // Ekrana anlık log yazan akıllı sensör fonksiyonu
         function printLog(msg, type = 'info') {
             const logger = document.getElementById('ui-logger');
             if(!logger) return;
@@ -263,18 +262,18 @@
                         generationConfig: { 
                             responseMimeType: "application/json",
                             responseSchema: {
-                                type: "OBJECT",
+                                type: "object", // KRİTİK: Tamamen küçük harfe çevrildi!
                                 properties: {
                                     items: {
-                                        type: "ARRAY",
+                                        type: "array", // KRİTİK: Tamamen küçük harfe çevrildi!
                                         items: {
-                                            type: "OBJECT",
+                                            type: "object",
                                             properties: {
-                                                item_code: {type: "STRING"},
-                                                item_name: {type: "STRING"},
-                                                unit: {type: "STRING"},
-                                                quantity: {type: "NUMBER"},
-                                                unit_price_tl: {type: "NUMBER"}
+                                                item_code: {type: "string"}, // Küçük harf
+                                                item_name: {type: "string"},
+                                                unit: {type: "string"},
+                                                quantity: {type: "number"}, // Küçük harf
+                                                unit_price_tl: {type: "number"}
                                             },
                                             required: ["item_code", "item_name", "unit", "quantity", "unit_price_tl"]
                                         }
@@ -308,8 +307,6 @@
                 printLog(`4/5: ${parsedItems.length} adet poz ayrıştırıldı. Supabase kayıt zinciri başlatılıyor...`, 'info');
 
                 // --- GÜVENLİ VERİTABANI GÖNDERİM SÜRECİ ---
-                
-                // Proje Kontrol
                 let { data: pData, error: pErr } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
                 if (pErr) throw new Error("Proje Tablo Hatası: " + pErr.message);
                 let project = pData && pData.length > 0 ? pData[0] : null;
@@ -318,11 +315,10 @@
                     printLog("Yeni proje algılandı, veritabanına açılıyor...", 'info');
                     const { data: nP, error: pInsErr } = await supabaseClient.from('projects').insert([{ project_name: projName }]).select('id');
                     if (pInsErr) throw new Error("Proje Eklenemedi: " + pInsErr.message);
-                    if (!nP || nP.length === 0) throw new Error("Proje eklendi fakat ID alınamadı. RLS Select politikanızı kontrol edin.");
+                    if (!nP || nP.length === 0) throw new Error("Proje eklendi fakat ID alınamadı.");
                     project = nP[0];
                 }
 
-                // Firma Kontrol
                 let { data: cData, error: cErr } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
                 if (cErr) throw new Error("Firma Tablo Hatası: " + cErr.message);
                 let company = cData && cData.length > 0 ? cData[0] : null;
@@ -331,22 +327,20 @@
                     printLog("Yeni firma algılandı, veritabanına açılıyor...", 'info');
                     const { data: nC, error: cInsErr } = await supabaseClient.from('companies').insert([{ company_name: compName }]).select('id');
                     if (cInsErr) throw new Error("Firma Eklenemedi: " + cInsErr.message);
-                    if (!nC || nC.length === 0) throw new Error("Firma eklendi fakat ID alınamadı. RLS Select politikanızı kontrol edin.");
+                    if (!nC || nC.length === 0) throw new Error("Firma eklendi fakat ID alınamadı.");
                     company = nC[0];
                 }
 
-                // Sözleşme Oluşturma
                 const { data: nCon, error: conErr } = await supabaseClient.from('contracts').insert([
                     { project_id: project.id, company_id: company.id, contract_date: effDate }
                 ]).select('id');
                 
                 if (conErr) throw new Error("Sözleşme Başlığı Oluşturulamadı: " + conErr.message);
-                if (!nCon || nCon.length === 0) throw new Error("Sözleşme eklendi fakat ID alınamadı. RLS Select politikanızı kontrol edin.");
+                if (!nCon || nCon.length === 0) throw new Error("Sözleşme eklendi fakat ID alınamadı.");
                 let contract = nCon[0];
 
                 printLog("5/5: Poz kalemleri toplu paket halinde Supabase'e enjekte ediliyor...", 'info');
 
-                // Poz Kalemlerini Toplu Gönderme
                 const itemsToInsert = parsedItems.map(item => ({
                     contract_id: contract.id,
                     item_code: String(item.item_code || '').trim(),
