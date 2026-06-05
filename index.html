@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>İnşaat Birim Fiyat Takip ve Endeksleme Sistemi</title>
+    <title>Yapay Zeka Destekli Birim Fiyat Takip Sistemi</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -14,27 +14,27 @@
     <div class="max-w-7xl mx-auto space-y-6">
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
-                <h1 class="text-2xl font-bold text-amber-500">Birim Fiyat Takip & Endeksleme Paneli</h1>
-                <p class="text-sm text-slate-400 mt-1">Sözleşme fiyatlarını ve birimleri Excel'den otomatik okur,詳CMB kuruyla endeksler.</p>
+                <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
+                <p class="text-sm text-slate-400 mt-1">Excel şablonları Google Gemini AI tarafından otomatik analiz edilerek Supabase'e işlenir.</p>
             </div>
-            <div id="connection-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Sistem Aktif
+            <div id="ai-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                Yapay Zeka Modülü Entegre Edildi
             </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
-                <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">1. Sözleşme / Revizyon Bilgisi</h2>
+                <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">1. Üst Sözleşme Bilgileri</h2>
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Proje Adı</label>
-                    <input type="text" id="project_name" placeholder="Örn: Folkart Narlidere Projesi" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                    <input type="text" id="project_name" placeholder="Örn: Narli Dere Projesi" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-400 mb-1">Firma / Taşeron Adı</label>
-                    <input type="text" id="company_name" placeholder="Örn: İnce İşler Yapı A.Ş." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                    <input type="text" id="company_name" placeholder="Örn: İnce İşler A.Ş." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-400 mb-1">Fiyat Geçerlilik Tarihi (Kur Bu Tarihten Alınır)</label>
+                    <label class="block text-xs font-medium text-slate-400 mb-1">Fiyat Geçerlilik / Revizyon Tarihi</label>
                     <input type="date" id="effective_date" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
@@ -45,16 +45,18 @@
 
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 flex flex-col justify-between md:col-span-2">
                 <div>
-                    <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">2. Keşif Dosyası Yükle</h2>
-                    <p class="text-xs text-slate-400 mt-2">Mevcut şablonunuzdaki sütunlar (POZ NO, İMALAT ADI, BİRİMİ, MİKTARI, B. FİYAT) otomatik algılanır.</p>
+                    <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">2. Keşif Dosyasını AI Yapay Zekaya Gönder</h2>
+                    <p class="text-xs text-slate-400 mt-2">Orijinal Excel dosyanızı seçin. Dosya içeriği şifreli olarak Google Gemini AI modeline gönderilecek ve tablo yapısı yapay zeka akıl yürütmesiyle kusursuzca çözülecektir.</p>
                 </div>
                 
-                <div id="drop-zone" class="border-2 border-dashed border-slate-600 rounded-xl p-8 text-center bg-slate-900/50 hover:border-amber-500 transition-colors mt-4 relative">
-                    <input type="file" id="excel_file" accept=".xlsx, .xls, .csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileSelect(event)">
-                    <p id="file-label" class="text-sm font-medium text-slate-300">Keşif Excel dosyasını buraya sürükleyin veya tıklayıp seçin</p>
+                <div class="my-6 p-6 bg-slate-900 rounded-xl border border-slate-700 text-center">
+                    <input type="file" id="excel_file" accept=".xlsx, .xls, .csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500/10 file:text-blue-400 hover:file:bg-blue-500/20 cursor-pointer" onchange="loadExcelToText(event)">
+                    <p id="file-status-text" class="text-xs text-blue-400 mt-3 font-medium">Yapay zekaya gönderilecek dosya seçilmedi.</p>
                 </div>
                 
-                <button onclick="processAndSaveData()" class="w-full mt-4 bg-amber-600 hover:bg-amber-500 text-white font-semibold py-2 rounded-lg text-sm shadow-lg transition-colors">Verileri O Günkü Kurla Endeksle ve Kaydet</button>
+                <button onclick="sendToAIAndSave()" id="upload-btn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded-lg text-sm shadow-lg transition-colors flex justify-center items-center gap-2">
+                    Yapay Zeka Analizini Başlat & Supabase'e Kaydet
+                </button>
             </div>
         </div>
 
@@ -62,9 +64,8 @@
             <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">3. Poz Bazlı Akıllı Analiz ve Revizyon Grafiği</h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input type="text" id="search_poz" placeholder="Poz Kodu Girin (Örn: ÖBF (1))" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
-                <button onclick="fetchPozHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-sm transition-colors">Pozun Tüm Fiyat Değişimlerini Getir</button>
+                <button onclick="fetchPozHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-sm transition-colors">Fiyat Değişim Trendini Çiz</button>
             </div>
-            
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-80">
                 <canvas id="historyChart"></canvas>
             </div>
@@ -72,135 +73,135 @@
     </div>
 
     <script>
-        // DIKKAT: Buraya Supabase adresinizi ve Anon şifrenizi girin!
+        // --- 1. GÜVENLİK AYARLARI KUTUSU ---
         const SUPABASE_URL = "https://supabase.com/dashboard/project/irigxievakecirilcioz/settings/api-keys";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyaWd4aWV2YWtlY2lyaWxjaW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NDcwODAsImV4cCI6MjA5NjIyMzA4MH0.bYb5RhyWIzfqNlnLw5B9RJwvgJVbFOQHL5_hh2rGB74";
+        const GEMINI_API_KEY = "AQ.Ab8RN6Lk-efl7mDzal7mS9yDtQoqDXbFCdvYkVVNDuW9IVBYAw";
         
-        // Çökmeyi engelleyen isim düzeltmesi yapıldı
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let parsedExcelData = [];
+        let rawExcelTextDump = "";
         let chartInstance = null;
 
-        // Sürükle bırak görsel efektleri için sensörler
-        const dropZone = document.getElementById('drop-zone');
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-amber-500'); });
-        dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-amber-500'); });
-        dropZone.addEventListener('drop', () => { dropZone.classList.remove('border-amber-500'); });
-
-        // Geliştirilmiş Akıllı Excel Okuma Fonksiyonu
-        function handleFileSelect(event) {
-            const file = event.target.files[0] || event.dataTransfer.files[0];
+        // Excel'i yapay zekanın anlayacağı ham metin formatına dönüştüren ara motor
+        function loadExcelToText(event) {
+            const file = event.target.files[0];
             if (!file) return;
             
-            document.getElementById('file-label').innerText = file.name + " okundu. İşlenmeye hazır.";
+            document.getElementById('file-status-text').innerText = "Dosya belleğe alındı: " + file.name;
             
             const reader = new FileReader();
             reader.onload = function(e) {
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
+                const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
                 
-                // Hücrelerdeki boşlukları ve noktaları temizleyip bilgisayarın kolayca bulmasını sağlayan yardımcı fonksiyon
-                const cleanText = (str) => String(str || '').toLowerCase().replace(/[\s\.\-_]/g, '');
-
-                let headerIndex = -1;
-                for(let i=0; i<rows.length; i++) {
-                    // Satırda POZ NO sütununu arıyoruz
-                    if(rows[i].some(cell => cleanText(cell).includes("pozno") || cleanText(cell) === "poz")) {
-                        headerIndex = i;
-                        break;
-                    }
-                }
-
-                if(headerIndex === -1) {
-                    alert("HATA: Excel dosyasında 'POZ NO' veya 'POZ' sütun başlığı algılanamadı! Lütfen kontrol edin.");
-                    return;
-                }
-
-                const headers = rows[headerIndex].map(h => cleanText(h));
-                parsedExcelData = [];
-
-                // Akıllı Sütun Eşleştirme (Boşluklu veya boşluksuz olsa da otomatik yakalar)
-                const pozIdx = headers.findIndex(h => h.includes("poz"));
-                const adiIdx = headers.findIndex(h => h.includes("imalatadi") || h.includes("adi") || h.includes("aciklama"));
-                const birimIdx = headers.findIndex(h => h.includes("birim"));
-                const miktarIdx = headers.findIndex(h => h.includes("miktar"));
-                const fiyatIdx = headers.findIndex(h => h === "bfiyat" || h === "birimfiyat" || h.includes("fiyat"));
-
-                for(let j = headerIndex + 1; j < rows.length; j++) {
-                    const row = rows[j];
-                    if(row[pozIdx] && row[fiyatIdx]) {
-                        parsedExcelData.push({
-                            item_code: String(row[pozIdx]).trim(),
-                            item_name: String(row[adiIdx] || '').trim(),
-                            unit: String(row[birimIdx] || 'm²').trim(),
-                            quantity: parseFloat(String(row[miktarIdx]).replace(',','.')) || 0,
-                            unit_price_tl: parseFloat(String(row[fiyatIdx]).replace(',','.')) || 0
-                        });
-                    }
-                }
-                alert("Başarılı: " + parsedExcelData.length + " adet imalat kalemi Excel'den otomatik ayrıştırıldı!");
+                // Excel tablosunu yapay zekanın en rahat okuduğu biçim olan CSV metnine çeviriyoruz
+                rawExcelTextDump = XLSX.utils.sheet_to_csv(firstSheet);
+                document.getElementById('file-status-text').innerText = file.name + " yapay zeka analizine hazır!";
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // Veritabanına Sorunsuz Kaydetme Fonksiyonu
-        async function processAndSaveData() {
+        // YAPAY ZEKAYI API İLE ÇAĞIRAN VE SUPABASE'E BAĞLAYAN ANA FONKSİYON
+        async function sendToAIAndSave() {
             const projName = document.getElementById('project_name').value.trim();
             const compName = document.getElementById('company_name').value.trim();
             const effDate = document.getElementById('effective_date').value;
             const revNote = document.getElementById('revision_note').value.trim();
+            const btn = document.getElementById('upload-btn');
 
-            if(!projName || !compName || !effDate || parsedExcelData.length === 0) {
-                alert("Lütfen eksik alanları doldurun ve önce geçerli bir Excel dosyası yükleyin!");
+            if (!projName || !compName || !effDate || !rawExcelTextDump) {
+                alert("Lütfen üst form bilgilerini eksiksiz doldurun ve bir Excel dosyası seçin!");
                 return;
             }
 
-            // Proje Kaydı
-            let { data: project } = await supabaseClient.from('projects').select('id').eq('project_name', projName).maybeSingle();
-            if(!project) {
-                const { data: newProj } = await supabaseClient.from('projects').insert([{ project_name: projName }]).select().single();
-                project = newProj;
-            }
+            btn.disabled = true;
+            btn.innerText = "Yapay Zeka Tabloyu Çözüyor, Lütfen Bekleyin...";
+            document.getElementById('ai-status').innerText = "AI Çözümlemesi Sürüyor...";
 
-            // Firma Kaydı
-            let { data: company } = await supabaseClient.from('companies').select('id').eq('company_name', compName).maybeSingle();
-            if(!company) {
-                const { data: newComp } = await supabaseClient.from('companies').insert([{ company_name: compName }]).select().single();
-                company = newComp;
-            }
+            // Yapay zekaya verilecek kusursuz mühendislik emri (Prompt)
+            const aiPrompt = `Sana bir inşaat keşif özetinin ham csv metin verilerini gönderiyorum. Senden bu verileri bir mühendis gibi inceleyerek tablo başlangıcını bulmanı ve sadece şu alanları içeren temiz bir JSON Array (Dizi) üretmeni istiyorum:
+            - item_code (Excel'deki "POZ NO" veya benzeri sütun değeri)
+            - item_name (Excel'deki "İMALAT ADI" veya açıklama sütun değeri)
+            - unit (Excel'deki "BİRİMİ" sütun değeri, m2, mt, kg vb.)
+            - quantity (Excel'deki "MİKTARI" sayısal değeri)
+            - unit_price_tl (Excel'deki "B. FİYAT" veya birim fiyat değeri, virgülden sonraki kuruşları noktaya çevir)
+            
+            Kurallar: Sadece geçerli poz içeren satırları al. Toplam satırlarını veya boşlukları es geç. Bana hiçbir açıklama veya markdown yazma, sadece saf ve temiz JSON datası döndür.
+            
+            Ham Veri:\n${rawExcelTextDump}`;
 
-            // Sözleşme Başlığı
-            const { data: contract } = await supabaseClient.from('contracts').insert([
-                { project_id: project.id, company_id: company.id, contract_date: effDate }
-            ]).select().single();
+            try {
+                // Google Gemini API Sunucularına doğrudan bağlantı isteği atıyoruz
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: aiPrompt }] }],
+                        generationConfig: { responseMimeType: "application/json" } // Çıktının sadece temiz JSON olmasını zorunlu kılıyoruz
+                    })
+                });
 
-            // Kalemlerin Toplu Gönderimi
-            const itemsToInsert = parsedExcelData.map(item => ({
-                contract_id: contract.id,
-                item_code: item.item_code,
-                item_name: item.item_name,
-                unit: item.unit,
-                quantity: item.quantity,
-                unit_price_tl: item.unit_price_tl,
-                price_effective_date: effDate,
-                revision_note: revNote
-            }));
+                const result = await response.json();
+                const aiJsonResponseText = result.candidates[0].content.parts[0].text;
+                const parsedItems = JSON.parse(aiJsonResponseText);
 
-            const { error } = await supabaseClient.from('contract_items').insert(itemsToInsert);
-            if(error) {
-                alert("Supabase Kayıt Hatası: " + error.message);
-            } else {
-                alert("Harika! Excel'deki tüm birimler ve fiyatlar başarıyla veritabanına işlendi ve endekslendi.");
+                if (!parsedItems || parsedItems.length === 0) {
+                    throw new Error("Yapay zeka verileri ayrıştıramadı.");
+                }
+
+                // AI İŞİNİ BİTİRDİ -> ŞİMDİ NORMAL PLATFORM SÜRECİ BAŞLIYOR (Supabase Kayıt)
+                let { data: project } = await supabaseClient.from('projects').select('id').eq('project_name', projName).maybeSingle();
+                if (!project) {
+                    const { data: nP } = await supabaseClient.from('projects').insert([{ project_name: projName }]).select().single();
+                    project = nP;
+                }
+
+                let { data: company } = await supabaseClient.from('companies').select('id').eq('company_name', compName).maybeSingle();
+                if (!company) {
+                    const { data: nC } = await supabaseClient.from('companies').insert([{ company_name: compName }]).select().single();
+                    company = nC;
+                }
+
+                const { data: contract, error: cErr } = await supabaseClient.from('contracts').insert([
+                    { project_id: project.id, company_id: company.id, contract_date: effDate }
+                ]).select().single();
+
+                if(cErr) throw new Error(cErr.message);
+
+                const itemsToInsert = parsedItems.map(item => ({
+                    contract_id: contract.id,
+                    item_code: String(item.item_code),
+                    item_name: String(item.item_name),
+                    unit: String(item.unit),
+                    quantity: parseFloat(item.quantity) || 0,
+                    unit_price_tl: parseFloat(item.unit_price_tl) || 0,
+                    price_effective_date: effDate,
+                    revision_note: revNote
+                }));
+
+                const { error: iErr } = await supabaseClient.from('contract_items').insert(itemsToInsert);
+                
+                if (iErr) throw new Error(iErr.message);
+
+                alert(`MÜKEMMEL! Yapay zeka Excel'i başarıyla çözdü ve ${parsedItems.length} adet imalat kalemini otomatik olarak endeksleyip Supabase'e kaydetti.`);
+                document.getElementById('excel_file').value = "";
+                rawExcelTextDump = "";
+
+            } catch (err) {
+                alert("Sistem Hatası: " + err.message);
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
+                document.getElementById('ai-status').innerText = "Sistem Hazır";
             }
         }
 
-        // Tarihsel Grafik Analizi Fonksiyonu
+        // GRAFİK SORGULAMA MOTORU (Aynı Kalıyor)
         async function fetchPozHistory() {
             const pozCode = document.getElementById('search_poz').value.trim();
-            if(!pozCode) return alert("Lütfen aramak istediğiniz poz kodunu girin!");
+            if (!pozCode) return alert("Lütfen aramak istediğiniz poz kodunu girin!");
 
             const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
@@ -208,7 +209,7 @@
                 .eq('item_code', pozCode)
                 .order('price_date', { ascending: true });
 
-            if(error || !data || data.length === 0) {
+            if (error || !data || data.length === 0) {
                 alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.");
                 return;
             }
@@ -224,7 +225,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: `${pozCode} Pozunun Güncel Dolar Kuruna Endeksli Karşılığı (TL)`,
+                        label: `${pozCode} Pozunun Güncel Döviz Kuruna Endeksli Değeri (TL)`,
                         data: pricesTl,
                         borderColor: '#f59e0b',
                         backgroundColor: 'rgba(245, 158, 11, 0.1)',
