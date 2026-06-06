@@ -217,7 +217,6 @@
             }
         }
 
-        // Akıllı Excel Okuma Motoru (Hücre ve Satır Düzenleyici)
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -228,13 +227,10 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    
-                    // Excel tablosunu ham CSV yerine temiz satır dizilerine (Array of Arrays) bölüyoruz
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
                     rows.forEach((row, index) => {
-                        // Tamamen boş satırları eleyerek token tasarrufu sağlıyoruz ve AI karmaşasını önlüyoruz
                         if (row.length > 0 && row.some(cell => cell !== null && cell !== undefined && cell !== "")) {
                             const cleanRowCells = row.map(cell => cell === null || cell === undefined ? "" : String(cell).trim());
                             optimizedText += `Satır ${index + 1}: ${cleanRowCells.join(" | ")}\n`;
@@ -277,7 +273,6 @@
             document.getElementById('ai-status').innerText = "AI Çözümlemede...";
             printLog("1/5: İstek paketi güvenli kanala ulaştırılıyor...", 'info');
 
-            // Geliştirilmiş Mühendislik Odaklı Prompt Mühendisliği
             const aiPrompt = `Aşağıda "Satır X: Hücre1 | Hücre2" formatında düzenlenmiş ham inşaat keşif metnindeki imalat satırlarını akıllıca analiz et.
             Başlık satırlarını ve tamamen boş satırları atlayarak sadece geçerli imalat kalemlerini (poz kodu, imalat adı, birimi, miktarı ve birim fiyatı olanları) ayıkla.
             
@@ -320,8 +315,6 @@
                 
                 let aiJsonResponseText = result.candidates[0].content.parts[0].text;
                 
-                // KURŞUN GEÇİRMEZ JSON AYIKLAMA MOTORU (Regex tabanlı)
-                // Gemini konuşma metni üretse bile sadece { ... } dışındaki tüm çöp karakterleri eler.
                 const jsonMatch = aiJsonResponseText.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) {
                     throw new Error("Yapay zeka yanıtından geçerli bir JSON veri ağacı çıkarılamadı.");
@@ -379,6 +372,7 @@
 
                 printLog("5/5: Pozlar toplu paket halinde sisteme basılıyor...", 'info');
 
+                // HATA DÜZELTMESİ: contract_items tablosunda olmayan price_effective_date kolonu kaldırıldı.
                 const itemsToInsert = parsedItems.map(item => ({
                     contract_id: contract.id,
                     item_code: String(item.item_code || '').trim(),
@@ -386,7 +380,6 @@
                     unit: String(item.unit || 'm²').trim(),
                     quantity: parseFloat(item.quantity) || 0,
                     unit_price_tl: parseFloat(item.unit_price_tl) || 0,
-                    price_effective_date: effDate,
                     revision_note: revNote
                 }));
 
