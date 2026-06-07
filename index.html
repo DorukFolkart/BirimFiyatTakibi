@@ -40,7 +40,7 @@
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
-                <p class="text-sm text-slate-400 mt-1">Excel şablonları Esnek Gemini AI Tüneli tarafından otonom çözülerek Supabase'e aktarılır.</p>
+                <p class="text-sm text-slate-400 mt-1">Excel şablonları Üst Düzey Gemini Pro AI Tüneli tarafından otonom çözülerek Supabase'e aktarılır.</p>
             </div>
             <div id="ai-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 Sistem Aktif
@@ -189,15 +189,17 @@
             }
         }
 
-        // AKILLI GERİ ÇEKİLME VE RETRY MODEL MOTORU (Kurşun Geçirmez İstek Katmanı)
+        // Geliştirilmiş Üst Düzey Akıllı Model İstek Katmanı (Pro Öncelikli)
         async function executeGeminiRequest(bodyPayload, key) {
-            const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+            // Hiyerarşi en üst düzey akıllı model olan Pro serisinden başlıyor
+            const models = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash'];
             let lastError = null;
 
             for (const model of models) {
-                let attempts = 2; // Her model için 2 kez dene
+                let attempts = 2; 
                 while (attempts > 0) {
                     try {
+                        printLog(`[AI] ${model} kanalı üzerinden bağlantı aranıyor...`, 'info');
                         const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key.trim()}`;
                         const response = await fetch(url, {
                             method: 'POST',
@@ -217,13 +219,11 @@
                         
                         lastError = new Error(errText || `HTTP ${response.status}`);
                         
-                        // Eğer yoğunluk (demand) veya limit aşımı hatası alındıysa bekle ve tekrar dene
                         if (errText.toLowerCase().includes("demand") || response.status === 429 || response.status === 503) {
-                            printLog(`[AI] ${model} hattında yoğunluk tespit edildi. 2 saniye içinde otomatik tekrar deneniyor...`, 'info');
+                            printLog(`[AI] ${model} hattında geçici yoğunluk var. 2 saniye içinde yeniden deneniyor...`, 'info');
                             await new Promise(resolve => setTimeout(resolve, 2000));
                             attempts--;
                         } else {
-                            // Kritik hata (örn: Geçersiz API Key), döngüyü kır
                             attempts = 0;
                         }
                     } catch (err) {
@@ -232,13 +232,13 @@
                         await new Promise(resolve => setTimeout(resolve, 1500));
                     }
                 }
-                printLog(`[AI] ${model} şu an aşırı yoğun. Alternatif yedek modele geçiş yapılıyor...`, 'info');
+                printLog(`[AI] ${model} tüneli atlandı, bir sonraki hatta geçiliyor...`, 'info');
             }
             throw lastError;
         }
 
         async function testGeminiConnection() {
-            printLog("Google Gemini API hattı test ediliyor...", 'info');
+            printLog("Google Gemini API üst segment hatları test ediliyor...", 'info');
             const key = localStorage.getItem('gemini_key');
             if(!key || key.length < 5) {
                 printLog("HATA: API Key tanımsız!", 'error');
@@ -246,8 +246,8 @@
             }
             try {
                 const result = await executeGeminiRequest({ contents: [{ parts: [{ text: "Hello" }] }] }, key);
-                printLog("✓ Yapay Zeka Hattı Sorunsuz Bağlandı!", 'success');
-                alert("✓ BAĞLANTI BAŞARILI: Google Gemini yapay zeka tüneli başarıyla doğrulandı!");
+                printLog("✓ Üst Düzey Yapay Zeka Onayı Alındı!", 'success');
+                alert("✓ BAĞLANTI BAŞARILI: En üst düzey Gemini Pro/Flash entegrasyon hattınız başarıyla doğrulandı!");
             } catch(err) {
                 printLog("✕ Yapay Zeka Bağlantı Reddi: " + err.message, 'error');
                 alert("✕ GOOGLE AI HATASI:\n" + err.message);
@@ -275,8 +275,8 @@
                     });
                     
                     rawExcelTextDump = optimizedText;
-                    document.getElementById('file-status-text').innerText = file.name + " optimize edildi, analize hazır.";
-                    printLog("Excel verisi AI için yapılandırılmış satır matrisine dönüştürüldü.", 'success');
+                    document.getElementById('file-status-text').innerText = file.name + " analize hazır.";
+                    printLog("Excel verisi yapılandırılmış satır matrisine dönüştürüldü.", 'success');
                 } catch(err) {
                     printLog("Excel dönüştürme hatası: " + err.message, 'error');
                 }
@@ -328,9 +328,7 @@
             Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama ekleme.\n\nHam Veri:\n${rawExcelTextDump}`;
 
             try {
-                printLog("2/5: Veriler esnek tünel mimarisiyle aktarılıyor...", 'info');
-                
-                // Doğrudan fetch yerine akıllı retry + model fallback katmanını çağırıyoruz
+                printLog("2/5: Veriler üst düzey akıllı tünel mimarisiyle aktarılıyor...", 'info');
                 const result = await executeGeminiRequest({ contents: [{ parts: [{ text: aiPrompt }] }] }, GEMINI_API_KEY);
 
                 printLog("3/5: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
@@ -462,7 +460,7 @@
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
-            document.getElementById('ui-logger').innerHTML += `<div class="text-emerald-400">[${new Date().toLocaleTimeString()}] Grafik başarıyla ekrana basıldı.</div>`;
+            printLog(`Grafik başarıyla ekrana basıldı.`, 'success');
         }
     </script>
 </body>
