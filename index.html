@@ -40,7 +40,7 @@
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
-                <p class="text-sm text-slate-400 mt-1">Excel şablonları Üst Düzey Gemini Pro AI Tüneli tarafından otonom çözülerek Supabase'e aktarılır.</p>
+                <p class="text-sm text-slate-400 mt-1">Excel şablonları Dinamik Kesintisiz Gemini AI Tüneli tarafından otonom çözülerek Supabase'e aktarılır.</p>
             </div>
             <div id="ai-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                 Sistem Aktif
@@ -189,17 +189,17 @@
             }
         }
 
-        // Geliştirilmiş Üst Düzey Akıllı Model İstek Katmanı (Pro Öncelikli)
+        // TAM KORUMALI AKILLI MODEL GEÇİŞ ZİNCİRİ (1.5-Flash Son Hat Olarak Eklendi)
         async function executeGeminiRequest(bodyPayload, key) {
-            // Hiyerarşi en üst düzey akıllı model olan Pro serisinden başlıyor
-            const models = ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash'];
+            // gemini-1.5-flash en kararlı ve yüksek kapasiteli model olarak zincirin sonuna eklendi
+            const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
             let lastError = null;
 
             for (const model of models) {
                 let attempts = 2; 
                 while (attempts > 0) {
                     try {
-                        printLog(`[AI] ${model} kanalı üzerinden bağlantı aranıyor...`, 'info');
+                        printLog(`[AI] ${model} tüneli aktif ediliyor...`, 'info');
                         const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key.trim()}`;
                         const response = await fetch(url, {
                             method: 'POST',
@@ -219,11 +219,14 @@
                         
                         lastError = new Error(errText || `HTTP ${response.status}`);
                         
+                        // Eğer yoğunluk (demand) hatası alınırsa bekle ve tekrar dene
                         if (errText.toLowerCase().includes("demand") || response.status === 429 || response.status === 503) {
-                            printLog(`[AI] ${model} hattında geçici yoğunluk var. 2 saniye içinde yeniden deneniyor...`, 'info');
-                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            printLog(`[AI] ${model} hattında yoğunluk var. 3 saniye içinde yeniden deneniyor... (Kalan Deneme: ${attempts - 1})`, 'info');
+                            await new Promise(resolve => setTimeout(resolve, 3000));
                             attempts--;
                         } else {
+                            // Model bulunamadı veya yetki hatası ise hiç bekleme, sonraki modele atla
+                            printLog(`[AI] ${model} tüneli geçilemedi (${response.status}). Diğer hatta aktarılıyor...`, 'error');
                             attempts = 0;
                         }
                     } catch (err) {
@@ -232,13 +235,12 @@
                         await new Promise(resolve => setTimeout(resolve, 1500));
                     }
                 }
-                printLog(`[AI] ${model} tüneli atlandı, bir sonraki hatta geçiliyor...`, 'info');
             }
             throw lastError;
         }
 
         async function testGeminiConnection() {
-            printLog("Google Gemini API üst segment hatları test ediliyor...", 'info');
+            printLog("Google Gemini API tünel zinciri test ediliyor...", 'info');
             const key = localStorage.getItem('gemini_key');
             if(!key || key.length < 5) {
                 printLog("HATA: API Key tanımsız!", 'error');
@@ -246,8 +248,8 @@
             }
             try {
                 const result = await executeGeminiRequest({ contents: [{ parts: [{ text: "Hello" }] }] }, key);
-                printLog("✓ Üst Düzey Yapay Zeka Onayı Alındı!", 'success');
-                alert("✓ BAĞLANTI BAŞARILI: En üst düzey Gemini Pro/Flash entegrasyon hattınız başarıyla doğrulandı!");
+                printLog("✓ Yapay Zeka Hattı Tamamen Doğrulandı!", 'success');
+                alert("✓ BAĞLANTI BAŞARILI: Google Gemini yapay zeka tünel zinciri başarıyla bağlandı!");
             } catch(err) {
                 printLog("✕ Yapay Zeka Bağlantı Reddi: " + err.message, 'error');
                 alert("✕ GOOGLE AI HATASI:\n" + err.message);
@@ -328,7 +330,7 @@
             Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama ekleme.\n\nHam Veri:\n${rawExcelTextDump}`;
 
             try {
-                printLog("2/5: Veriler üst düzey akıllı tünel mimarisiyle aktarılıyor...", 'info');
+                printLog("2/5: Veriler dinamik tünel zinciriyle aktarılıyor...", 'info');
                 const result = await executeGeminiRequest({ contents: [{ parts: [{ text: aiPrompt }] }] }, GEMINI_API_KEY);
 
                 printLog("3/5: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
