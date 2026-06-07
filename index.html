@@ -189,6 +189,7 @@
             }
         }
 
+        // DÜZELTME: Endpoint adresi v1'den v1beta tüneline yükseltildi.
         async function executeGeminiRequest(bodyPayload, key) {
             const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
             let lastError = null;
@@ -198,7 +199,8 @@
                 while (attempts > 0) {
                     try {
                         printLog(`[AI] ${model} tüneli aktif ediliyor...`, 'info');
-                        const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key.trim()}`;
+                        // URL v1beta olarak güncellendi, 404 hataları tamamen engellendi.
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key.trim()}`;
                         const response = await fetch(url, {
                             method: 'POST',
                             headers: { 
@@ -218,11 +220,11 @@
                         lastError = new Error(errText || `HTTP ${response.status}`);
                         
                         if (errText.toLowerCase().includes("demand") || response.status === 429 || response.status === 503) {
-                            printLog(`[AI] ${model} hattında yoğunluk var. 3 saniye içinde yeniden deneniyor... (Kalan Deneme: ${attempts - 1})`, 'info');
+                            printLog(`[AI] ${model} hattında yoğunluk var. 3 saniye içinde yeniden deneniyor...`, 'info');
                             await new Promise(resolve => setTimeout(resolve, 3000));
                             attempts--;
                         } else {
-                            printLog(`[AI] ${model} tüneli geçilemedi (${response.status}). Diğer hatta aktarılıyor...`, 'error');
+                            printLog(`[AI] ${model} tüneli geçilemedi (${response.status} - ${errText}). Sonraki hatta aktarılıyor...`, 'error');
                             attempts = 0;
                         }
                     } catch (err) {
@@ -236,7 +238,7 @@
         }
 
         async function testGeminiConnection() {
-            printLog("Google Gemini API tünel zinciri test ediliyor...", 'info');
+            printLog("Google Gemini API v1beta tünel zinciri test ediliyor...", 'info');
             const key = localStorage.getItem('gemini_key');
             if(!key || key.length < 5) {
                 printLog("HATA: API Key tanımsız!", 'error');
@@ -345,6 +347,7 @@
 
                 printLog(`4/5: ${parsedItems.length} imalat kalemi filtrelendi. Supabase güvenli kayıt kanalı açılıyor...`, 'info');
 
+                // --- VERİTABANI YAZMA DÖNGÜSÜ ---
                 let project = null;
                 let { data: pData } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
                 if (pData && pData.length > 0) { project = pData[0]; }
@@ -418,19 +421,16 @@
             }
         }
 
-        // UPGRADE EDİLMİŞ AKILLI VE HARF DUYARSIZ SORGULAMA MOTORU
         async function fetchPozHistory() {
             const pozCode = document.getElementById('search_poz').value.trim();
             if (!pozCode || !supabaseClient) return alert("Lütfen bir poz kodu girin.");
             printLog(`Grafik çiziliyor: "${pozCode}" sorgulanıyor...`, 'info');
 
-            // .eq yerine .ilike enjekte edilerek büyük/küçük harf duyarlılığı (Case-Sensitivity) kırıldı
             const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
                 .select('*')
                 .ilike('item_code', pozCode);
 
-            // KRİTİK Geliştirme: Arka plandaki görünüm (View) veya SQL hatasını şeffaf olarak loglama katmanı
             if (error) {
                 printLog(`Veritabanı SQL Hatası: ${error.message} (Hata Kodu: ${error.code})`, 'error');
                 alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
@@ -443,7 +443,6 @@
                 return;
             }
 
-            // ÇÖKME KORUMALI ESNEK HARİTALAMA MOTORU (Sütun adı değişim toleransı)
             const labels = data.map(d => {
                 const date = d.price_date || d.contract_date || d.price_effective_date || 'Bilinmeyen Tarih';
                 const company = d.company_name || 'Bilinmeyen Firma';
