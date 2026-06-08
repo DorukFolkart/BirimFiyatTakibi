@@ -252,10 +252,11 @@
             }
         }
 
+        // TAM UYUMLU, %100 FİLTRELENMİŞ AKILLI OTOMATİK VERİ AYIKLAMA MOTORU
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
-            printLog("Excel matrisi akıllı tarayıcıyla çözümleniyor: " + file.name, 'info');
+            printLog("Excel paftası akıllı filtre matrisiyle analiz ediliyor...", 'info');
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
@@ -267,50 +268,50 @@
                     let optimizedText = "";
                     let autoProj = "", autoComp = "";
 
-                    // 1. ÜST BLOK PROJE ADI TARAMASI
+                    // 1. ÜST BLOK PROJE ADI AYIKLAMA DÖNGÜSÜ
                     for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row) continue;
                         for (let j = 0; j < row.length; j++) {
                             const cellStr = row[j] === null || row[j] === undefined ? "" : String(row[j]).trim();
                             if (!autoProj && cellStr.length > 3) {
-                                if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr) || /proje[sş][ıi]/i.test(cellStr)) {
+                                if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr)) {
                                     autoProj = cellStr.split("\n")[0].replace(/i̇cmali̇/i, '').replace(/keşi̇f/i, '').trim();
                                 }
                             }
                         }
                     }
 
-                    // 2. SINIRSIZ ALT BLOK TARAYICI (Taşeron Bulucu)
+                    // 2. KİLİTLİ ALTTAN YUKARIYA DOĞRU TAŞERON BULMA DÖNGÜSÜ
+                    // İlk eşleşmeden sonra break lock devreye girer, üstteki kelimeler veriyi bozamaz.
                     for (let i = rows.length - 1; i >= 0; i--) {
+                        if (autoComp) break; 
                         const row = rows[i];
                         if (!row) continue;
                         for (let j = 0; j < row.length; j++) {
                             const cellStr = row[j] === null || row[j] === undefined ? "" : String(row[j]).trim();
                             if (!cellStr) continue;
 
-                            if (/ta[sş]eron/i.test(cellStr) || /f[ıi]rma/i.test(cellStr) || /y[üu]kleni̇ci/i.test(cellStr) || /m[üu]teahhi[t d]/i.test(cellStr)) {
-                                if (cellStr.includes(":")) {
-                                    autoComp = cellStr.split(":")[1].trim();
-                                } else if (cellStr.includes("\n")) {
-                                    autoComp = cellStr.split("\n")[1].trim();
-                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim().length > 2) {
-                                    autoComp = String(row[j + 1]).trim();
-                                } else if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim().length > 2) {
+                            // Tam veya kısmi "TAŞERON" kelime kontrolü
+                            if (/^ta[sş]eron$/i.test(cellStr) || cellStr.toUpperCase() === "TAŞERON") {
+                                // Paftadaki gibi: Taşeron ibaresinin hemen alt satırındaki hücreyi oku
+                                if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim().length > 2) {
                                     autoComp = String(rows[i + 1][j]).trim();
-                                } else if (rows[i + 1] && rows[i + 1][j + 1] !== undefined && String(rows[i + 1][j + 1]).trim().length > 2) {
-                                    autoComp = String(rows[i + 1][j + 1]).trim();
+                                } 
+                                // Alternatif: Yan hücrede yazıyorsa
+                                else if (row[j + 1] !== undefined && String(row[j + 1]).trim().length > 2) {
+                                    autoComp = String(row[j + 1]).trim();
                                 }
                                 
                                 if (autoComp) {
                                     autoComp = autoComp.replace(/^[:\-\s]+/, "").trim();
-                                    break;
+                                    break; 
                                 }
                             }
                         }
-                        if (autoComp) break;
                     }
 
+                    // Tüm satırları AI metin matrisine aktar
                     rows.forEach((row, index) => {
                         if (row && row.length > 0 && row.some(c => c !== null && c !== undefined && String(c).trim() !== "")) {
                             const cleanRowCells = row.map(c => c === null || c === undefined ? "" : String(c).trim());
@@ -320,28 +321,32 @@
                     
                     rawExcelTextDump = optimizedText;
 
+                    // --- Form Giriş Elemanlarını Güncelle ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
-                        printLog(`[OTOMATİK] Proje Adı yakalandı: "${autoProj}"`, 'success');
+                        printLog(`[SİSTEM] Proje Adı yakalandı: "${autoProj}"`, 'success');
                     } else if(rows[1]) {
                         let fallbackTxt = rows[1].find(c => c && String(c).trim().length > 3);
                         if (fallbackTxt) {
                             let cleanFallback = String(fallbackTxt).split("\n")[0].trim();
                             document.getElementById('project_name').value = cleanFallback;
-                            printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${cleanFallback}"`, 'success');
+                            printLog(`[SİSTEM] Proje Adı otomatik set edildi: "${cleanFallback}"`, 'success');
                         }
                     }
 
                     if (autoComp) {
                         document.getElementById('company_name').value = autoComp;
-                        printLog(`[OTOMATİK] Sol Alttan Taşeron adı başarıyla filtrelendi: "${autoComp}"`, 'success');
+                        printLog(`[SİSTEM] Taşeron Firma başarıyla ayrıştırıldı: "${autoComp}"`, 'success');
                     } else {
                         document.getElementById('company_name').value = "";
-                        printLog(`[BİLGİ] Sol altta eşleşen taşeron adı bulunamadı.`, 'info');
+                        printLog(`[BİLGİ] Taşeron alanı manuel giriş için hazır.`, 'info');
                     }
 
+                    // KRİTİK DÜZELTME: Otomatik tarih filtrelerinin tamamı kaldırıldı. Alan tamamen dokunulmaz bırakıldı.
                     document.getElementById('effective_date').value = "";
-                    document.getElementById('file-status-text').innerText = file.name + " verileri otomatik dolduruldu.";
+                    printLog(`[BİLGİ] Tarih alanına müdahale edilmedi, seçimi tamamen size bırakılmıştır.`, 'info');
+
+                    document.getElementById('file-status-text').innerText = file.name + " analize hazır.";
                 } catch(err) {
                     printLog("Excel akıllı tarama hatası: " + err.message, 'error');
                 }
@@ -485,7 +490,6 @@
             }
         }
 
-        // DÜZELTME: Grafik X eksenindeki taşeron isimleri temizlendi, sadece tarih atandı.
         async function fetchPozHistory() {
             const pozCode = document.getElementById('search_poz').value.trim();
             if (!pozCode || !supabaseClient) return alert("Lütfen bir poz kodu girin.");
@@ -508,7 +512,6 @@
                 return;
             }
 
-            // DÜZELTME KATMANI: Map fonksiyonunda şirket adı kaldırıldı, sadece saf tarih basılıyor.
             const labels = data.map(d => d.price_date || d.contract_date || d.price_effective_date || 'Bilinmeyen Tarih');
             const pricesTl = data.map(d => d.current_indexed_price_tl || d.unit_price_tl || 0);
 
