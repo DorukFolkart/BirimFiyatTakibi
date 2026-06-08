@@ -252,7 +252,7 @@
             }
         }
 
-        // KURŞUN GEÇİRMEZ DIŞA AKTARMA VE OTOMATİK DOLDURMA MOTORU (REGEXP TABANLI)
+        // TAŞERONU PAFTANIN SOL ALTINDAN YAKALAYAN YENİ NESİL GELİŞMİŞ MOTOR
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -269,103 +269,91 @@
                     let optimizedText = "";
                     let autoProj = "", autoComp = "", autoDate = "";
 
-                    // Akıllı REGEX Filtreleme Katmanı: Dil ayarlarından bağımsız yakalama yapar
-                    for (let i = 0; i < Math.min(rows.length, 30); i++) {
+                    // A. ÜST BLOK TARAMASI (Proje Adı ve Tarih Yakalama)
+                    for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row) continue;
-                        
-                        let hasData = false;
-                        const cleanRowCells = [];
-
                         for (let j = 0; j < row.length; j++) {
                             const cellRaw = row[j];
                             const cellStr = cellRaw === null || cellRaw === undefined ? "" : String(cellRaw).trim();
-                            cleanRowCells.push(cellStr);
                             
-                            if (cellStr !== "") hasData = true;
-
-                            // 1. Proje Adı Çıkarma (FOLKART veya NARLIDERE kelimelerini tarar)
+                            // Folkart / Narlıdere başlığını yakalama katmanı
                             if (!autoProj && cellStr.length > 3) {
                                 if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr) || /proje[sş][ıi]/i.test(cellStr)) {
-                                    // Eğer hücre içinde satır kırma (\n) varsa sadece başlığı al
                                     autoProj = cellStr.split("\n")[0].replace(/i̇cmali̇/i, '').replace(/keşi̇f/i, '').trim();
                                 }
                             }
 
-                            // 2. Firma / Taşeron Çıkarma
-                            if (!autoComp && cellStr.length > 3) {
-                                if (/f[ıi]rma/i.test(cellStr) || /ta[sş]eron/i.test(cellStr) || /m[üu]teahhi[t d]/i.test(cellStr) || /y[üu]kleni̇ci/i.test(cellStr)) {
-                                    if (cellStr.includes(":")) {
-                                        autoComp = cellStr.split(":")[1].trim();
-                                    } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
-                                        autoComp = String(row[j + 1]).trim();
-                                    }
-                                }
-                            }
-
-                            // 3. Tarih Hücresi Çıkarma
+                            // Üst hizada tarih yakalama katmanı
                             if (!autoDate && cellStr.length > 5) {
                                 let dateMatch = cellStr.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
-                                if (dateMatch) {
-                                    autoDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
-                                } else if (/tarih/i.test(cellStr)) {
-                                    let nextCell = row[j + 1];
-                                    if (nextCell) {
-                                        let nextStr = String(nextCell).trim();
-                                        let match = nextStr.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
-                                        if (match) autoDate = `${match[3]}-${match[2]}-${match[1]}`;
-                                    }
+                                if (dateMatch) autoDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+                            }
+                        }
+                    }
+
+                    // B. TERS ALT BLOK TARAMASI (Sol Alttaki Taşeron İsmini Yakalama Algoritması)
+                    // Sayfanın en sonundan yukarıya doğru tarama yaparak sol ilk 3 kolona odaklanır
+                    for (let i = rows.length - 1; i >= 0; i--) {
+                        const row = rows[i];
+                        if (!row) continue;
+                        for (let j = 0; j < Math.min(row.length, 3); j++) {
+                            const cellRaw = row[j];
+                            const cellStr = cellRaw === null || cellRaw === undefined ? "" : String(cellRaw).trim();
+                            if (!cellStr) continue;
+
+                            if (/ta[sş]eron/i.test(cellStr) || /f[ıi]rma/i.test(cellStr) || /y[üu]kleni̇ci/i.test(cellStr) || /m[üu]teahhi[t d]/i.test(cellStr)) {
+                                if (cellStr.includes(":")) {
+                                    autoComp = cellStr.split(":")[1].trim();
+                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                    autoComp = String(row[j + 1]).trim();
+                                } else if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim() !== "") {
+                                    // Eğer etiket üstte, isim hemen altındaki hücrede yer alıyorsa
+                                    autoComp = String(rows[i + 1][j]).trim();
                                 }
                             }
                         }
-
-                        if (hasData) {
-                            optimizedText += `Satır ${i + 1}: ${cleanRowCells.join(" | ")}\n`;
-                        }
+                        if (autoComp) break; // Bulunduğu an döngüyü kırar
                     }
 
-                    // Kalan satırları normal matris hiyerarşisinde ekle
-                    for (let i = 30; i < rows.length; i++) {
-                        const row = rows[i];
+                    // Tüm satırları AI metin matrisine dök
+                    rows.forEach((row, index) => {
                         if (row && row.length > 0 && row.some(c => c !== null && c !== undefined && String(c).trim() !== "")) {
                             const cleanRowCells = row.map(c => c === null || c === undefined ? "" : String(c).trim());
-                            optimizedText += `Satır ${i + 1}: ${cleanRowCells.join(" | ")}\n`;
+                            optimizedText += `Satır ${index + 1}: ${cleanRowCells.join(" | ")}\n`;
                         }
-                    }
+                    });
                     
                     rawExcelTextDump = optimizedText;
 
-                    // --- Form Elemanlarını Ekrana Bas ---
+                    // --- Arayüz Elemanlarını Formlara Bas ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
                         printLog(`[OTOMATİK] Proje Adı yakalandı: "${autoProj}"`, 'success');
-                    } else {
-                        // Hücre taraması başarısız olursa 2. satırda bulunan ana hücreyi fallback kabul et
-                        if(rows[1]) {
-                            let fallbackTxt = rows[1].find(c => c && String(c).trim().length > 3);
-                            if (fallbackTxt) {
-                                let cleanFallback = String(fallbackTxt).split("\n")[0].trim();
-                                document.getElementById('project_name').value = cleanFallback;
-                                printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${cleanFallback}"`, 'success');
-                            }
+                    } else if(rows[1]) {
+                        let fallbackTxt = rows[1].find(c => c && String(c).trim().length > 3);
+                        if (fallbackTxt) {
+                            let cleanFallback = String(fallbackTxt).split("\n")[0].trim();
+                            document.getElementById('project_name').value = cleanFallback;
+                            printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${cleanFallback}"`, 'success');
                         }
                     }
 
                     if (autoComp) {
                         document.getElementById('company_name').value = autoComp;
-                        printLog(`[OTOMATİK] Firma / Taşeron yakalandı: "${autoComp}"`, 'success');
+                        printLog(`[OTOMATİK] Sol Alttan Taşeron adı yakalandı: "${autoComp}"`, 'success');
                     } else {
-                        printLog(`[BİLGİ] Excel içinde belirgin bir taşeron/firma adı etiketlenmemiş, lütfen manuel giriniz.`, 'info');
+                        document.getElementById('company_name').value = "";
+                        printLog(`[BİLGİ] Sol altta belirgin bir firma adına ulaşılamadı.`, 'info');
                     }
 
                     if (autoDate) {
                         document.getElementById('effective_date').value = autoDate;
                         printLog(`[OTOMATİK] Yürürlük Tarihi yakalandı: "${autoDate}"`, 'success');
                     } else {
-                        // Tarih bulunamazsa formun kilitlenmesini önlemek için bugünün tarihini default ata
-                        const today = new Date().toISOString().split('T')[0];
-                        document.getElementById('effective_date').value = today;
-                        printLog(`[OTOMATİK] Dosyada tarih bulunamadı, bugünün tarihi atandı: "${today}"`, 'info');
+                        // İSTEK DOĞRULTUSUNDA: Otomatik bugünün tarihini atama mantığı tamamen kaldırıldı
+                        document.getElementById('effective_date').value = "";
+                        printLog(`[BİLGİ] Excel'de geçerli tarih hücresi bulunamadı, alan boş bırakıldı.`, 'info');
                     }
 
                     document.getElementById('file-status-text').innerText = file.name + " verileri otomatik dolduruldu.";
