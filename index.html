@@ -189,7 +189,6 @@
             }
         }
 
-        // DÜZELTME: Endpoint adresi v1'den v1beta tüneline yükseltildi.
         async function executeGeminiRequest(bodyPayload, key) {
             const models = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
             let lastError = null;
@@ -199,7 +198,6 @@
                 while (attempts > 0) {
                     try {
                         printLog(`[AI] ${model} tüneli aktif ediliyor...`, 'info');
-                        // URL v1beta olarak güncellendi, 404 hataları tamamen engellendi.
                         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key.trim()}`;
                         const response = await fetch(url, {
                             method: 'POST',
@@ -254,6 +252,7 @@
             }
         }
 
+        // AKILLI OTOMATİK DOLDURMA MOTORU ENTEGRE EDİLMİŞ EXCEL OKUYUCU
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -267,15 +266,93 @@
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
-                    rows.forEach((row, index) => {
-                        if (row.length > 0 && row.some(cell => cell !== null && cell !== undefined && cell !== "")) {
-                            const cleanRowCells = row.map(cell => cell === null || cell === undefined ? "" : String(cell).trim());
-                            optimizedText += `Satır ${index + 1}: ${cleanRowCells.join(" | ")}\n`;
+                    let autoProj = "", autoComp = "", autoDate = "";
+
+                    // Akıllı Satır Tarayıcı: İlk 20 satırdaki meta verileri filtreler
+                    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+                        const row = rows[i];
+                        if (!row) continue;
+                        
+                        let hasData = false;
+                        const cleanRowCells = [];
+
+                        for (let j = 0; j < row.length; j++) {
+                            const cellRaw = row[j];
+                            const cellStr = cellRaw === null || cellRaw === undefined ? "" : String(cellRaw).trim();
+                            cleanRowCells.push(cellStr);
+                            
+                            if (cellStr !== "") hasData = true;
+                            const cellLower = cellStr.toLowerCase();
+
+                            // 1. Proje Adı Çıkarma Algoritması
+                            if (cellLower.includes("proje") && !autoProj) {
+                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
+                                    autoProj = cellStr.split(":")[1].trim();
+                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                    autoProj = String(row[j + 1]).trim();
+                                }
+                            }
+                            // 2. Firma / Taşeron Adı Çıkarma Algoritması
+                            if ((cellLower.includes("firma") || cellLower.includes("taşeron") || cellLower.includes("taseron") || cellLower.includes("müteahhit")) && !autoComp) {
+                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
+                                    autoComp = cellStr.split(":")[1].trim();
+                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                    autoComp = String(row[j + 1]).trim();
+                                }
+                            }
+                            // 3. Tarih Çıkarma ve Standardizasyon Algoritması
+                            if (cellLower.includes("tarih") && !autoDate) {
+                                let rawDate = "";
+                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
+                                    rawDate = cellStr.split(":")[1].trim();
+                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                    rawDate = String(row[j + 1]).trim();
+                                }
+
+                                if (rawDate) {
+                                    // GG.AA.YYYY veya GG/AA/YYYY formatlarını yakala
+                                    let match = rawDate.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
+                                    if (match) {
+                                        autoDate = `${match[3]}-${match[2]}-${match[1]}`; // YYYY-MM-DD formatına dönüştürür
+                                    } else {
+                                        let isoMatch = rawDate.match(/(\d{4})-(\d{2})-(\d{2})/);
+                                        if (isoMatch) autoDate = rawDate;
+                                    }
+                                }
+                            }
                         }
-                    });
+
+                        if (hasData) {
+                            optimizedText += `Satır ${i + 1}: ${cleanRowCells.join(" | ")}\n`;
+                        }
+                    }
+
+                    // Kalan satırları normal matris metnine eklemeye devam et
+                    for (let i = 20; i < rows.length; i++) {
+                        const row = rows[i];
+                        if (row && row.length > 0 && row.some(c => c !== null && c !== undefined && String(c).trim() !== "")) {
+                            const cleanRowCells = row.map(c => c === null || c === undefined ? "" : String(c).trim());
+                            optimizedText += `Satır ${i + 1}: ${cleanRowCells.join(" | ")}\n`;
+                        }
+                    }
                     
                     rawExcelTextDump = optimizedText;
-                    document.getElementById('file-status-text').innerText = file.name + " analize hazır.";
+
+                    // Arayüz Form Girdilerini Otomatik Doldur
+                    if (autoProj) {
+                        document.getElementById('project_name').value = autoProj;
+                        printLog(`[OTOMATİK] Proje Adı tespit edildi: "${autoProj}"`, 'success');
+                    }
+                    if (autoComp) {
+                        document.getElementById('company_name').value = autoComp;
+                        printLog(`[OTOMATİK] Firma Adı tespit edildi: "${autoComp}"`, 'success');
+                    }
+                    if (autoDate) {
+                        document.getElementById('effective_date').value = autoDate;
+                        printLog(`[OTOMATİK] Yürürlük Tarihi tespit edildi: "${autoDate}"`, 'success');
+                    }
+
+                    document.getElementById('file-status-text').innerText = file.name + " çözüldü ve form dolduruldu.";
                     printLog("Excel verisi yapılandırılmış satır matrisine dönüştürüldü.", 'success');
                 } catch(err) {
                     printLog("Excel dönüştürme hatası: " + err.message, 'error');
@@ -372,104 +449,4 @@
                     if (cInsErr) throw new Error("Firma Eklenemedi: " + cInsErr.message);
                     if (nC && nC.length > 0) { company = nC[0]; }
                     else {
-                        let { data: retryC } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
-                        company = retryC ? retryC[0] : null;
-                    }
-                }
-                if(!company) throw new Error("Firma kimliği (ID) RLS engeline takıldı.");
-
-                const { data: nCon, error: conErr } = await supabaseClient.from('contracts').insert([
-                    { project_id: project.id, company_id: company.id, contract_date: effDate }
-                ]).select('id');
-                
-                if (conErr) throw new Error("Sözleşme Başlığı Oluşturulamadı: " + conErr.message);
-                let contract = nCon && nCon.length > 0 ? nCon[0] : null;
-                if(!contract) {
-                    let { data: retryCon } = await supabaseClient.from('contracts').select('id').eq('project_id', project.id).eq('company_id', company.id).order('id', {ascending:false}).limit(1);
-                    contract = retryCon ? retryCon[0] : null;
-                }
-                if(!contract) throw new Error("Sözleşme ID bağlantısı kurulamadı.");
-
-                printLog("5/5: Pozlar toplu paket halinde sisteme basılıyor...", 'info');
-
-                const itemsToInsert = parsedItems.map(item => ({
-                    contract_id: contract.id,
-                    item_code: String(item.item_code || '').trim(),
-                    item_name: String(item.item_name || '').trim(),
-                    unit: String(item.unit || 'm²').trim(),
-                    quantity: parseFloat(item.quantity) || 0,
-                    unit_price_tl: parseFloat(item.unit_price_tl) || 0
-                }));
-
-                const { error: iErr } = await supabaseClient.from('contract_items').insert(itemsToInsert);
-                if (iErr) throw new Error("Poz Kalemleri Toplu Kayıt Hatası: " + iErr.message);
-
-                printLog(`✓ İŞLEM TAMAMLANDI: ${parsedItems.length} adet poz başarıyla işlendi.`, 'success');
-                alert(`✓ BAŞARILI: Yapay zeka Excel verilerini başarıyla ayrıştırdı ve ${parsedItems.length} adet imalat kalemini veritabanınıza kaydetti.`);
-                
-                document.getElementById('excel_file').value = "";
-                rawExcelTextDump = "";
-
-            } catch (err) {
-                printLog("✕ İŞLEM DURDURULDU: " + err.message, 'error');
-                alert("İŞLEM DURDURULDU:\n" + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.style.opacity = "1";
-                btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
-                document.getElementById('ai-status').innerText = "Sistem Aktif";
-            }
-        }
-
-        async function fetchPozHistory() {
-            const pozCode = document.getElementById('search_poz').value.trim();
-            if (!pozCode || !supabaseClient) return alert("Lütfen bir poz kodu girin.");
-            printLog(`Grafik çiziliyor: "${pozCode}" sorgulanıyor...`, 'info');
-
-            const { data, error } = await supabaseClient
-                .from('v_indexed_contract_items')
-                .select('*')
-                .ilike('item_code', pozCode);
-
-            if (error) {
-                printLog(`Veritabanı SQL Hatası: ${error.message} (Hata Kodu: ${error.code})`, 'error');
-                alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
-                return;
-            }
-
-            if (!data || data.length === 0) {
-                printLog(`Grafik Hatası: "${pozCode}" koduyla eşleşen hiçbir kayıt bulunamadı.`, 'error');
-                alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.\nLütfen harf boşluklarını kontrol edin.");
-                return;
-            }
-
-            const labels = data.map(d => {
-                const date = d.price_date || d.contract_date || d.price_effective_date || 'Bilinmeyen Tarih';
-                const company = d.company_name || 'Bilinmeyen Firma';
-                return `${date} (${company})`;
-            });
-            const pricesTl = data.map(d => d.current_indexed_price_tl || d.unit_price_tl || 0);
-
-            if (chartInstance) { chartInstance.destroy(); }
-
-            const ctx = document.getElementById('historyChart').getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: `${pozCode} Pozunun Güncel Döviz Kuruna Endeksli Değeri (TL)`,
-                        data: pricesTl,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        borderWidth: 3,
-                        fill: true
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-            printLog(`✓ Grafik ekrana basıldı: ${data.length} adet geçmiş veri noktası işlendi.`, 'success');
-        }
-    </script>
-</body>
-</html>
+                        let { data: retryC } = await supabaseClient.from('companies').select('id').eq('company_name', compName).
