@@ -252,7 +252,7 @@
             }
         }
 
-        // GELİŞTİRİLMİŞ GERÇEK EXCEL METİN MATRİS VE OTOMATİK DOLDURMA MOTORU
+        // KURŞUN GEÇİRMEZ DIŞA AKTARMA VE OTOMATİK DOLDURMA MOTORU (REGEXP TABANLI)
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -264,14 +264,13 @@
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
                     
-                    // Veriyi matris (Array of Arrays) hiyerarşisinde oku
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
                     let autoProj = "", autoComp = "", autoDate = "";
 
-                    // Akıllı Algoritma: İlk 10 satırı başlık metinleri için derinlemesine tara
-                    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    // Akıllı REGEX Filtreleme Katmanı: Dil ayarlarından bağımsız yakalama yapar
+                    for (let i = 0; i < Math.min(rows.length, 30); i++) {
                         const row = rows[i];
                         if (!row) continue;
                         
@@ -284,41 +283,38 @@
                             cleanRowCells.push(cellStr);
                             
                             if (cellStr !== "") hasData = true;
-                            const cellLower = cellStr.toLowerCase();
 
-                            // Folkart / Narlidere yapısına tam uyumlu dinamik Proje Adı yakalama
-                            if (!autoProj && cellStr.length > 4) {
-                                if (cellLower.includes("folkart") || cellLower.includes("narlidere") || cellLower.includes("narlıdere") || cellLower.includes("projesi") || cellLower.includes("projesı")) {
-                                    if (cellStr.includes("\n")) {
-                                        // "FOLKART NARLIDERE\nİNCE İNŞAAT..." yapısını tam buradan böler
-                                        autoProj = cellStr.split("\n")[0].trim();
-                                    } else {
-                                        autoProj = cellStr;
+                            // 1. Proje Adı Çıkarma (FOLKART veya NARLIDERE kelimelerini tarar)
+                            if (!autoProj && cellStr.length > 3) {
+                                if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr) || /proje[sş][ıi]/i.test(cellStr)) {
+                                    // Eğer hücre içinde satır kırma (\n) varsa sadece başlığı al
+                                    autoProj = cellStr.split("\n")[0].replace(/i̇cmali̇/i, '').replace(/keşi̇f/i, '').trim();
+                                }
+                            }
+
+                            // 2. Firma / Taşeron Çıkarma
+                            if (!autoComp && cellStr.length > 3) {
+                                if (/f[ıi]rma/i.test(cellStr) || /ta[sş]eron/i.test(cellStr) || /m[üu]teahhi[t d]/i.test(cellStr) || /y[üu]kleni̇ci/i.test(cellStr)) {
+                                    if (cellStr.includes(":")) {
+                                        autoComp = cellStr.split(":")[1].trim();
+                                    } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                        autoComp = String(row[j + 1]).trim();
                                     }
                                 }
                             }
 
-                            // Klasik anahtar kelime tabanlı fallbacks
-                            if (cellLower.includes("proje") && !autoProj && cellStr.includes(":")) {
-                                autoProj = cellStr.split(":")[1].trim();
-                            }
-                            if ((cellLower.includes("firma") || cellLower.includes("taşeron") || cellLower.includes("taseron") || cellLower.includes("müteahhit")) && !autoComp) {
-                                if (cellStr.includes(":")) {
-                                    autoComp = cellStr.split(":")[1].trim();
-                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
-                                    autoComp = String(row[j + 1]).trim();
-                                }
-                            }
-                            if (cellLower.includes("tarih") && !autoDate) {
-                                let rawDate = "";
-                                if (cellStr.includes(":")) {
-                                    rawDate = cellStr.split(":")[1].trim();
-                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
-                                    rawDate = String(row[j + 1]).trim();
-                                }
-                                if (rawDate) {
-                                    let match = rawDate.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
-                                    if (match) autoDate = `${match[3]}-${match[2]}-${match[1]}`;
+                            // 3. Tarih Hücresi Çıkarma
+                            if (!autoDate && cellStr.length > 5) {
+                                let dateMatch = cellStr.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
+                                if (dateMatch) {
+                                    autoDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+                                } else if (/tarih/i.test(cellStr)) {
+                                    let nextCell = row[j + 1];
+                                    if (nextCell) {
+                                        let nextStr = String(nextCell).trim();
+                                        let match = nextStr.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
+                                        if (match) autoDate = `${match[3]}-${match[2]}-${match[1]}`;
+                                    }
                                 }
                             }
                         }
@@ -329,7 +325,7 @@
                     }
 
                     // Kalan satırları normal matris hiyerarşisinde ekle
-                    for (let i = 10; i < rows.length; i++) {
+                    for (let i = 30; i < rows.length; i++) {
                         const row = rows[i];
                         if (row && row.length > 0 && row.some(c => c !== null && c !== undefined && String(c).trim() !== "")) {
                             const cleanRowCells = row.map(c => c === null || c === undefined ? "" : String(c).trim());
@@ -339,16 +335,19 @@
                     
                     rawExcelTextDump = optimizedText;
 
-                    // --- Form Elemanlarını Akıllı Doldurma ---
+                    // --- Form Elemanlarını Ekrana Bas ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
                         printLog(`[OTOMATİK] Proje Adı yakalandı: "${autoProj}"`, 'success');
                     } else {
-                        // Eğer hiçbir şey bulunamazsa 2. satırın ilk hücresini fallback yap
-                        if(rows[1] && rows[1].find(c => c)) {
-                            let fallbackTxt = String(rows[1].find(c => c)).split("\n")[0].trim();
-                            document.getElementById('project_name').value = fallbackTxt;
-                            printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${fallbackTxt}"`, 'success');
+                        // Hücre taraması başarısız olursa 2. satırda bulunan ana hücreyi fallback kabul et
+                        if(rows[1]) {
+                            let fallbackTxt = rows[1].find(c => c && String(c).trim().length > 3);
+                            if (fallbackTxt) {
+                                let cleanFallback = String(fallbackTxt).split("\n")[0].trim();
+                                document.getElementById('project_name').value = cleanFallback;
+                                printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${cleanFallback}"`, 'success');
+                            }
                         }
                     }
 
@@ -356,20 +355,20 @@
                         document.getElementById('company_name').value = autoComp;
                         printLog(`[OTOMATİK] Firma / Taşeron yakalandı: "${autoComp}"`, 'success');
                     } else {
-                        printLog(`[BİLGİ] Excel içinde belirgin bir firma adı bulunamadı, lütfen manuel giriniz.`, 'info');
+                        printLog(`[BİLGİ] Excel içinde belirgin bir taşeron/firma adı etiketlenmemiş, lütfen manuel giriniz.`, 'info');
                     }
 
                     if (autoDate) {
                         document.getElementById('effective_date').value = autoDate;
                         printLog(`[OTOMATİK] Yürürlük Tarihi yakalandı: "${autoDate}"`, 'success');
                     } else {
-                        // Tarih bulunamazsa formun tıkanmasını önlemek için bugünün tarihini basıyoruz
+                        // Tarih bulunamazsa formun kilitlenmesini önlemek için bugünün tarihini default ata
                         const today = new Date().toISOString().split('T')[0];
                         document.getElementById('effective_date').value = today;
-                        printLog(`[OTOMATİK] Tarih bulunamadı, bugünün tarihi atandı: "${today}"`, 'info');
+                        printLog(`[OTOMATİK] Dosyada tarih bulunamadı, bugünün tarihi atandı: "${today}"`, 'info');
                     }
 
-                    document.getElementById('file-status-text').innerText = file.name + " verileri otomatik ayrıştırıldı.";
+                    document.getElementById('file-status-text').innerText = file.name + " verileri otomatik dolduruldu.";
                 } catch(err) {
                     printLog("Excel akıllı tarama hatası: " + err.message, 'error');
                 }
@@ -527,3 +526,41 @@
                 printLog(`Veritabanı SQL Hatası: ${error.message} (Hata Kodu: ${error.code})`, 'error');
                 alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
                 return;
+            }
+
+            if (!data || data.length === 0) {
+                printLog(`Grafik Hatası: "${pozCode}" koduyla eşleşen hiçbir kayıt bulunamadı.`, 'error');
+                alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.\nLütfen harf boşluklarını kontrol edin.");
+                return;
+            }
+
+            const labels = data.map(d => {
+                const date = d.price_date || d.contract_date || d.price_effective_date || 'Bilinmeyen Tarih';
+                const company = d.company_name || 'Bilinmeyen Firma';
+                return `${date} (${company})`;
+            });
+            const pricesTl = data.map(d => d.current_indexed_price_tl || d.unit_price_tl || 0);
+
+            if (chartInstance) { chartInstance.destroy(); }
+
+            const ctx = document.getElementById('historyChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${pozCode} Pozunun Güncel Döviz Kuruna Endeksli Değeri (TL)`,
+                        data: pricesTl,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 3,
+                        fill: true
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            printLog(`✓ Grafik ekrana basıldı: ${data.length} adet geçmiş veri noktası işlendi.`, 'success');
+        }
+    </script>
+</body>
+</html>
