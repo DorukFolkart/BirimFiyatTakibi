@@ -120,10 +120,9 @@
             logger.scrollTop = logger.scrollHeight;
         }
 
-        function sanitizeUrl(url) {
+        fn_sanitizeUrl = (url) => {
             if(!url) return "";
-            let clean = url.trim();
-            clean = clean.replace(/\/rest\/v1\/?$/, "");
+            let clean = url.trim().replace(/\/rest\/v1\/?$/, "");
             if(clean.endsWith('/')) { clean = clean.slice(0, -1); }
             return clean;
         }
@@ -134,7 +133,7 @@
                 const savedKey = localStorage.getItem('sb_key');
                 const savedGemini = localStorage.getItem('gemini_key');
                 
-                if(savedUrl) document.getElementById('cfg_sb_url').value = sanitizeUrl(savedUrl);
+                if(savedUrl) document.getElementById('cfg_sb_url').value = fn_sanitizeUrl(savedUrl);
                 if(savedKey) document.getElementById('cfg_sb_key').value = savedKey.trim();
                 if(savedGemini) document.getElementById('cfg_gemini_key').value = savedGemini.trim();
                 initSupabase();
@@ -146,7 +145,7 @@
         function saveSettings() {
             try {
                 const rawUrl = document.getElementById('cfg_sb_url').value;
-                localStorage.setItem('sb_url', sanitizeUrl(rawUrl));
+                localStorage.setItem('sb_url', fn_sanitizeUrl(rawUrl));
                 localStorage.setItem('sb_key', document.getElementById('cfg_sb_key').value.trim());
                 localStorage.setItem('gemini_key', document.getElementById('cfg_gemini_key').value.trim());
                 initSupabase();
@@ -162,7 +161,7 @@
             const key = localStorage.getItem('sb_key');
             if(url && key && url.length > 5 && key.length > 5) {
                 try {
-                    supabaseClient = window.supabase.createClient(sanitizeUrl(url), key.trim());
+                    supabaseClient = window.supabase.createClient(fn_sanitizeUrl(url), key.trim());
                     document.getElementById('ai-status').innerText = "Veritabanı Entegre Edildi";
                     printLog("Supabase İstemcisi Başlatıldı.", 'success');
                 } catch(e) {
@@ -252,6 +251,7 @@
             }
         }
 
+        // AKILLI SÜREÇ DÜZENLEYİCİ EXCEL AYRIŞTIRMA KATMANI
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -265,9 +265,9 @@
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
-                    let autoProj = "";
+                    let autoProj = "", autoComp = "";
 
-                    // ÜST BLOK PROJE ADI AYIKLAMA DÖNGÜSÜ
+                    // 1. ÜST BLOK SİLİNDİRİK PROJE ADI TARAMASI
                     for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row) continue;
@@ -276,6 +276,30 @@
                             if (!autoProj && cellStr.length > 3) {
                                 if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr)) {
                                     autoProj = cellStr.split("\n")[0].replace(/i̇cmali̇/i, '').replace(/keşi̇f/i, '').trim();
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. KİLİTLİ ALTTAN YUKARIYA DOĞRU TAŞERON BULMA DÖNGÜSÜ (Üst Panel Doldurması İçin Geri Getirildi)
+                    for (let i = rows.length - 1; i >= 0; i--) {
+                        if (autoComp) break; 
+                        const row = rows[i];
+                        if (!row) continue;
+                        for (let j = 0; j < row.length; j++) {
+                            const cellStr = row[j] === null || row[j] === undefined ? "" : String(row[j]).trim();
+                            if (!cellStr) continue;
+
+                            if (/^ta[sş]eron$/i.test(cellStr) || cellStr.toUpperCase() === "TAŞERON") {
+                                if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim().length > 2) {
+                                    autoComp = String(rows[i + 1][j]).trim();
+                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim().length > 2) {
+                                    autoComp = String(row[j + 1]).trim();
+                                }
+                                
+                                if (autoComp) {
+                                    autoComp = autoComp.replace(/^[:\-\s]+/, "").trim();
+                                    break; 
                                 }
                             }
                         }
@@ -290,6 +314,7 @@
                     
                     rawExcelTextDump = optimizedText;
 
+                    // --- Üst Panel Form Giriş Alanlarını Güncelleme ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
                         printLog(`[SİSTEM] Proje Adı yakalandı: "${autoProj}"`, 'success');
@@ -298,15 +323,21 @@
                         if (fallbackTxt) {
                             let cleanFallback = String(fallbackTxt).split("\n")[0].trim();
                             document.getElementById('project_name').value = cleanFallback;
-                            printLog(`[SİSTEM] Proje Adı otomatik set edildi: "${cleanFallback}"`, 'success');
                         }
                     }
 
-                    // İstek üzerine firma ve tarih otomatik doldurma alanı tamamen pasif
-                    document.getElementById('company_name').value = "";
+                    // FİRMA ADI YUKARIDAKİ INPUT ALANINA YAZILIR
+                    if (autoComp) {
+                        document.getElementById('company_name').value = autoComp;
+                        printLog(`[SİSTEM] Taşeron Firma adı üst panele basıldı: "${autoComp}"`, 'success');
+                    } else {
+                        document.getElementById('company_name').value = "";
+                    }
+
+                    // Tarih Alanı tamamen dokunulmaz ve boş bırakıldı
                     document.getElementById('effective_date').value = "";
 
-                    document.getElementById('file-status-text').innerText = file.name + " analize hazır.";
+                    document.getElementById('file-status-text').innerText = file.name + " yüklendi ve hazır.";
                 } catch(err) {
                     printLog("Excel akıllı tarama hatası: " + err.message, 'error');
                 }
@@ -450,7 +481,7 @@
             }
         }
 
-        // KESİN DÜZELTME: X ekseninde şirket isimleri tamamen engellendi, sadece saf tarih basılıyor.
+        // KESİN KİLİTLEME: Grafiğin X ekseninde şirket isimleri tamamen engellenmiştir, sadece saf tarih basılır.
         async function fetchPozHistory() {
             const pozCode = document.getElementById('search_poz').value.trim();
             if (!pozCode || !supabaseClient) return alert("Lütfen bir poz kodu girin.");
@@ -462,18 +493,16 @@
                 .ilike('item_code', pozCode);
 
             if (error) {
-                printLog(`Veritabanı SQL Hatası: ${error.message} (Hata Kodu: ${error.code})`, 'error');
-                alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
-                return;
+                printLog(`Veritabanı SQL Hatası: ${error.message}`, 'error');
+                return alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
             }
 
             if (!data || data.length === 0) {
                 printLog(`Grafik Hatası: "${pozCode}" koduyla eşleşen hiçbir kayıt bulunamadı.`, 'error');
-                alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.\nLütfen harf boşluklarını kontrol edin.");
-                return;
+                return alert("Bu poza ait geçmiş fiyat/revizyon kaydı bulunamadı.");
             }
 
-            // Firma adı tamamen kaldırıldı, sadece tarih dizesi basılıyor.
+            // X EKSENİ ETİKETLERİ: Şirket adı tamamen kaldırıldı, sadece saf tarih dizesi basılıyor.
             const labels = data.map(d => d.price_date || d.contract_date || 'Bilinmeyen Tarih');
             const pricesTl = data.map(d => d.current_indexed_price_tl || d.unit_price_tl || 0);
 
