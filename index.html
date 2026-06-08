@@ -252,24 +252,26 @@
             }
         }
 
-        // AKILLI OTOMATİK DOLDURMA MOTORU ENTEGRE EDİLMİŞ EXCEL OKUYUCU
+        // GELİŞTİRİLMİŞ GERÇEK EXCEL METİN MATRİS VE OTOMATİK DOLDURMA MOTORU
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
-            printLog("Excel matrisi çözümleniyor: " + file.name, 'info');
+            printLog("Excel matrisi akıllı tarayıcıyla çözümleniyor: " + file.name, 'info');
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    
+                    // Veriyi matris (Array of Arrays) hiyerarşisinde oku
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
                     let autoProj = "", autoComp = "", autoDate = "";
 
-                    // Akıllı Satır Tarayıcı: İlk 20 satırdaki meta verileri filtreler
-                    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+                    // Akıllı Algoritma: İlk 10 satırı başlık metinleri için derinlemesine tara
+                    for (let i = 0; i < Math.min(rows.length, 10); i++) {
                         const row = rows[i];
                         if (!row) continue;
                         
@@ -284,40 +286,39 @@
                             if (cellStr !== "") hasData = true;
                             const cellLower = cellStr.toLowerCase();
 
-                            // 1. Proje Adı Çıkarma Algoritması
-                            if (cellLower.includes("proje") && !autoProj) {
-                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
-                                    autoProj = cellStr.split(":")[1].trim();
-                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
-                                    autoProj = String(row[j + 1]).trim();
+                            // Folkart / Narlidere yapısına tam uyumlu dinamik Proje Adı yakalama
+                            if (!autoProj && cellStr.length > 4) {
+                                if (cellLower.includes("folkart") || cellLower.includes("narlidere") || cellLower.includes("narlıdere") || cellLower.includes("projesi") || cellLower.includes("projesı")) {
+                                    if (cellStr.includes("\n")) {
+                                        // "FOLKART NARLIDERE\nİNCE İNŞAAT..." yapısını tam buradan böler
+                                        autoProj = cellStr.split("\n")[0].trim();
+                                    } else {
+                                        autoProj = cellStr;
+                                    }
                                 }
                             }
-                            // 2. Firma / Taşeron Adı Çıkarma Algoritması
+
+                            // Klasik anahtar kelime tabanlı fallbacks
+                            if (cellLower.includes("proje") && !autoProj && cellStr.includes(":")) {
+                                autoProj = cellStr.split(":")[1].trim();
+                            }
                             if ((cellLower.includes("firma") || cellLower.includes("taşeron") || cellLower.includes("taseron") || cellLower.includes("müteahhit")) && !autoComp) {
-                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
+                                if (cellStr.includes(":")) {
                                     autoComp = cellStr.split(":")[1].trim();
                                 } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
                                     autoComp = String(row[j + 1]).trim();
                                 }
                             }
-                            // 3. Tarih Çıkarma ve Standardizasyon Algoritması
                             if (cellLower.includes("tarih") && !autoDate) {
                                 let rawDate = "";
-                                if (cellLower.includes(":") && cellStr.split(":")[1].trim() !== "") {
+                                if (cellStr.includes(":")) {
                                     rawDate = cellStr.split(":")[1].trim();
                                 } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
                                     rawDate = String(row[j + 1]).trim();
                                 }
-
                                 if (rawDate) {
-                                    // GG.AA.YYYY veya GG/AA/YYYY formatlarını yakala
                                     let match = rawDate.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
-                                    if (match) {
-                                        autoDate = `${match[3]}-${match[2]}-${match[1]}`; // YYYY-MM-DD formatına dönüştürür
-                                    } else {
-                                        let isoMatch = rawDate.match(/(\d{4})-(\d{2})-(\d{2})/);
-                                        if (isoMatch) autoDate = rawDate;
-                                    }
+                                    if (match) autoDate = `${match[3]}-${match[2]}-${match[1]}`;
                                 }
                             }
                         }
@@ -327,8 +328,8 @@
                         }
                     }
 
-                    // Kalan satırları normal matris metnine eklemeye devam et
-                    for (let i = 20; i < rows.length; i++) {
+                    // Kalan satırları normal matris hiyerarşisinde ekle
+                    for (let i = 10; i < rows.length; i++) {
                         const row = rows[i];
                         if (row && row.length > 0 && row.some(c => c !== null && c !== undefined && String(c).trim() !== "")) {
                             const cleanRowCells = row.map(c => c === null || c === undefined ? "" : String(c).trim());
@@ -338,24 +339,39 @@
                     
                     rawExcelTextDump = optimizedText;
 
-                    // Arayüz Form Girdilerini Otomatik Doldur
+                    // --- Form Elemanlarını Akıllı Doldurma ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
-                        printLog(`[OTOMATİK] Proje Adı tespit edildi: "${autoProj}"`, 'success');
-                    }
-                    if (autoComp) {
-                        document.getElementById('company_name').value = autoComp;
-                        printLog(`[OTOMATİK] Firma Adı tespit edildi: "${autoComp}"`, 'success');
-                    }
-                    if (autoDate) {
-                        document.getElementById('effective_date').value = autoDate;
-                        printLog(`[OTOMATİK] Yürürlük Tarihi tespit edildi: "${autoDate}"`, 'success');
+                        printLog(`[OTOMATİK] Proje Adı yakalandı: "${autoProj}"`, 'success');
+                    } else {
+                        // Eğer hiçbir şey bulunamazsa 2. satırın ilk hücresini fallback yap
+                        if(rows[1] && rows[1].find(c => c)) {
+                            let fallbackTxt = String(rows[1].find(c => c)).split("\n")[0].trim();
+                            document.getElementById('project_name').value = fallbackTxt;
+                            printLog(`[OTOMATİK] Proje Adı başlığı set edildi: "${fallbackTxt}"`, 'success');
+                        }
                     }
 
-                    document.getElementById('file-status-text').innerText = file.name + " çözüldü ve form dolduruldu.";
-                    printLog("Excel verisi yapılandırılmış satır matrisine dönüştürüldü.", 'success');
+                    if (autoComp) {
+                        document.getElementById('company_name').value = autoComp;
+                        printLog(`[OTOMATİK] Firma / Taşeron yakalandı: "${autoComp}"`, 'success');
+                    } else {
+                        printLog(`[BİLGİ] Excel içinde belirgin bir firma adı bulunamadı, lütfen manuel giriniz.`, 'info');
+                    }
+
+                    if (autoDate) {
+                        document.getElementById('effective_date').value = autoDate;
+                        printLog(`[OTOMATİK] Yürürlük Tarihi yakalandı: "${autoDate}"`, 'success');
+                    } else {
+                        // Tarih bulunamazsa formun tıkanmasını önlemek için bugünün tarihini basıyoruz
+                        const today = new Date().toISOString().split('T')[0];
+                        document.getElementById('effective_date').value = today;
+                        printLog(`[OTOMATİK] Tarih bulunamadı, bugünün tarihi atandı: "${today}"`, 'info');
+                    }
+
+                    document.getElementById('file-status-text').innerText = file.name + " verileri otomatik ayrıştırıldı.";
                 } catch(err) {
-                    printLog("Excel dönüştürme hatası: " + err.message, 'error');
+                    printLog("Excel akıllı tarama hatası: " + err.message, 'error');
                 }
             };
             reader.readAsArrayBuffer(file);
@@ -424,7 +440,6 @@
 
                 printLog(`4/5: ${parsedItems.length} imalat kalemi filtrelendi. Supabase güvenli kayıt kanalı açılıyor...`, 'info');
 
-                // --- VERİTABANI YAZMA DÖNGÜSÜ ---
                 let project = null;
                 let { data: pData } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
                 if (pData && pData.length > 0) { project = pData[0]; }
@@ -449,4 +464,66 @@
                     if (cInsErr) throw new Error("Firma Eklenemedi: " + cInsErr.message);
                     if (nC && nC.length > 0) { company = nC[0]; }
                     else {
-                        let { data: retryC } = await supabaseClient.from('companies').select('id').eq('company_name', compName).
+                        let { data: retryC } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
+                        company = retryC ? retryC[0] : null;
+                    }
+                }
+                if(!company) throw new Error("Firma kimliği (ID) RLS engeline takıldı.");
+
+                const { data: nCon, error: conErr } = await supabaseClient.from('contracts').insert([
+                    { project_id: project.id, company_id: company.id, contract_date: effDate }
+                ]).select('id');
+                
+                if (conErr) throw new Error("Sözleşme Başlığı Oluşturulamadı: " + conErr.message);
+                let contract = nCon && nCon.length > 0 ? nCon[0] : null;
+                if(!contract) {
+                    let { data: retryCon } = await supabaseClient.from('contracts').select('id').eq('project_id', project.id).eq('company_id', company.id).order('id', {ascending:false}).limit(1);
+                    contract = retryCon ? retryCon[0] : null;
+                }
+                if(!contract) throw new Error("Sözleşme ID bağlantısı kurulamadı.");
+
+                printLog("5/5: Pozlar toplu paket halinde sisteme basılıyor...", 'info');
+
+                const itemsToInsert = parsedItems.map(item => ({
+                    contract_id: contract.id,
+                    item_code: String(item.item_code || '').trim(),
+                    item_name: String(item.item_name || '').trim(),
+                    unit: String(item.unit || 'm²').trim(),
+                    quantity: parseFloat(item.quantity) || 0,
+                    unit_price_tl: parseFloat(item.unit_price_tl) || 0
+                }));
+
+                const { error: iErr } = await supabaseClient.from('contract_items').insert(itemsToInsert);
+                if (iErr) throw new Error("Poz Kalemleri Toplu Kayıt Hatası: " + iErr.message);
+
+                printLog(`✓ İŞLEM TAMAMLANDI: ${parsedItems.length} adet poz başarıyla işlendi.`, 'success');
+                alert(`✓ BAŞARILI: Yapay zeka Excel verilerini başarıyla ayrıştırdı ve ${parsedItems.length} adet imalat kalemini veritabanınıza kaydetti.`);
+                
+                document.getElementById('excel_file').value = "";
+                rawExcelTextDump = "";
+
+            } catch (err) {
+                printLog("✕ İŞLEM DURDURULDU: " + err.message, 'error');
+                alert("İŞLEM DURDURULDU:\n" + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
+                document.getElementById('ai-status').innerText = "Sistem Aktif";
+            }
+        }
+
+        async function fetchPozHistory() {
+            const pozCode = document.getElementById('search_poz').value.trim();
+            if (!pozCode || !supabaseClient) return alert("Lütfen bir poz kodu girin.");
+            printLog(`Grafik çiziliyor: "${pozCode}" sorgulanıyor...`, 'info');
+
+            const { data, error } = await supabaseClient
+                .from('v_indexed_contract_items')
+                .select('*')
+                .ilike('item_code', pozCode);
+
+            if (error) {
+                printLog(`Veritabanı SQL Hatası: ${error.message} (Hata Kodu: ${error.code})`, 'error');
+                alert("Veritabanı sorgusu başarısız oldu:\n" + error.message);
+                return;
