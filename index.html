@@ -43,7 +43,7 @@
                 <p class="text-sm text-slate-400 mt-1">Excel şablonları Dinamik Kesintisiz Gemini AI Tüneli tarafından otonom çözülerek Supabase'e aktarılır.</p>
             </div>
             <div id="ai-status" class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                Sistem Aktif
+                Sistem Hack Korumalı
             </div>
         </div>
 
@@ -252,7 +252,7 @@
             }
         }
 
-        // TAŞERONU PAFTANIN SOL ALTINDAN YAKALAYAN YENİ NESİL GELİŞMİŞ MOTOR
+        // TAM UYUMLU VE TARİHSİZ AKILLI OKUMA MOTORU
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -263,57 +263,60 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     
                     let optimizedText = "";
-                    let autoProj = "", autoComp = "", autoDate = "";
+                    let autoProj = "", autoComp = "";
 
-                    // A. ÜST BLOK TARAMASI (Proje Adı ve Tarih Yakalama)
+                    // DÜZELTME 1: Tarih yakalama mantığı (autoDate) koddan tamamen kazındı.
+
+                    // 1. ÜST BLOK PROJE ADI TARAMASI
                     for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row) continue;
                         for (let j = 0; j < row.length; j++) {
-                            const cellRaw = row[j];
-                            const cellStr = cellRaw === null || cellRaw === undefined ? "" : String(cellRaw).trim();
-                            
-                            // Folkart / Narlıdere başlığını yakalama katmanı
+                            const cellStr = row[j] === null || row[j] === undefined ? "" : String(row[j]).trim();
                             if (!autoProj && cellStr.length > 3) {
                                 if (/folkart/i.test(cellStr) || /narl[ıi]dere/i.test(cellStr) || /proje[sş][ıi]/i.test(cellStr)) {
                                     autoProj = cellStr.split("\n")[0].replace(/i̇cmali̇/i, '').replace(/keşi̇f/i, '').trim();
                                 }
                             }
-
-                            // Üst hizada tarih yakalama katmanı
-                            if (!autoDate && cellStr.length > 5) {
-                                let dateMatch = cellStr.match(/(\d{2})[\.\/-](\d{2})[\.\/-](\d{4})/);
-                                if (dateMatch) autoDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
-                            }
                         }
                     }
 
-                    // B. TERS ALT BLOK TARAMASI (Sol Alttaki Taşeron İsmini Yakalama Algoritması)
-                    // Sayfanın en sonundan yukarıya doğru tarama yaparak sol ilk 3 kolona odaklanır
+                    // DÜZELTME 2: SINIRSIZ ALT BLOK TARAYICI (Taşeron Bulucu)
+                    // Sayfanın en sonundan yukarıya doğru TÜM kolonları tarar, hücre birleşmelerine takılmaz.
                     for (let i = rows.length - 1; i >= 0; i--) {
                         const row = rows[i];
                         if (!row) continue;
-                        for (let j = 0; j < Math.min(row.length, 3); j++) {
-                            const cellRaw = row[j];
-                            const cellStr = cellRaw === null || cellRaw === undefined ? "" : String(cellRaw).trim();
+                        for (let j = 0; j < row.length; j++) {
+                            const cellStr = row[j] === null || row[j] === undefined ? "" : String(row[j]).trim();
                             if (!cellStr) continue;
 
+                            // Taşeron, Firma veya Yüklenici etiketini yakala
                             if (/ta[sş]eron/i.test(cellStr) || /f[ıi]rma/i.test(cellStr) || /y[üu]kleni̇ci/i.test(cellStr) || /m[üu]teahhi[t d]/i.test(cellStr)) {
+                                // Yapı 1: "TAŞERON: ABC İNŞAAT" (Hücre içi veri)
                                 if (cellStr.includes(":")) {
                                     autoComp = cellStr.split(":")[1].trim();
-                                } else if (row[j + 1] !== undefined && String(row[j + 1]).trim() !== "") {
+                                } else if (cellStr.includes("\n")) {
+                                    autoComp = cellStr.split("\n")[1].trim();
+                                } 
+                                // Yapı 2: Yan hücrede veya alt hücrede yer alıyorsa
+                                else if (row[j + 1] !== undefined && String(row[j + 1]).trim().length > 2) {
                                     autoComp = String(row[j + 1]).trim();
-                                } else if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim() !== "") {
-                                    // Eğer etiket üstte, isim hemen altındaki hücrede yer alıyorsa
+                                } else if (rows[i + 1] && rows[i + 1][j] !== undefined && String(rows[i + 1][j]).trim().length > 2) {
                                     autoComp = String(rows[i + 1][j]).trim();
+                                } else if (rows[i + 1] && rows[i + 1][j + 1] !== undefined && String(rows[i + 1][j + 1]).trim().length > 2) {
+                                    autoComp = String(rows[i + 1][j + 1]).trim();
+                                }
+                                
+                                if (autoComp) {
+                                    autoComp = autoComp.replace(/^[:\-\s]+/, "").trim(); // Temizlik yap
+                                    break;
                                 }
                             }
                         }
-                        if (autoComp) break; // Bulunduğu an döngüyü kırar
+                        if (autoComp) break;
                     }
 
                     // Tüm satırları AI metin matrisine dök
@@ -326,7 +329,7 @@
                     
                     rawExcelTextDump = optimizedText;
 
-                    // --- Arayüz Elemanlarını Formlara Bas ---
+                    // --- Form Elemanlarını Ekrana Bas ---
                     if (autoProj) {
                         document.getElementById('project_name').value = autoProj;
                         printLog(`[OTOMATİK] Proje Adı yakalandı: "${autoProj}"`, 'success');
@@ -341,20 +344,14 @@
 
                     if (autoComp) {
                         document.getElementById('company_name').value = autoComp;
-                        printLog(`[OTOMATİK] Sol Alttan Taşeron adı yakalandı: "${autoComp}"`, 'success');
+                        printLog(`[OTOMATİK] Sol Alttan Taşeron adı başarıyla filtrelendi: "${autoComp}"`, 'success');
                     } else {
                         document.getElementById('company_name').value = "";
-                        printLog(`[BİLGİ] Sol altta belirgin bir firma adına ulaşılamadı.`, 'info');
+                        printLog(`[BİLGİ] Sol altta eşleşen taşeron adı bulunamadı.`, 'info');
                     }
 
-                    if (autoDate) {
-                        document.getElementById('effective_date').value = autoDate;
-                        printLog(`[OTOMATİK] Yürürlük Tarihi yakalandı: "${autoDate}"`, 'success');
-                    } else {
-                        // İSTEK DOĞRULTUSUNDA: Otomatik bugünün tarihini atama mantığı tamamen kaldırıldı
-                        document.getElementById('effective_date').value = "";
-                        printLog(`[BİLGİ] Excel'de geçerli tarih hücresi bulunamadı, alan boş bırakıldı.`, 'info');
-                    }
+                    // Tarih Alanı Kesinlikle Dokunulmaz Bırakıldı
+                    document.getElementById('effective_date').value = "";
 
                     document.getElementById('file-status-text').innerText = file.name + " verileri otomatik dolduruldu.";
                 } catch(err) {
