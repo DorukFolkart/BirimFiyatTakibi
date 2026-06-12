@@ -260,13 +260,13 @@
                 setStatusBadge('error');
                 const hint = err.message.includes('JWT') || err.message.includes('auth')
                     ? "\n\nİpucu: Anon Key hatalı olabilir."
-                    : "\n\nİpucu: URL and Key doğruysa Supabase RLS politikalarınızı kontrol edin.";
+                    : "\n\nİpucu: URL ve Key doğruysa Supabase RLS politikalarınızı kontrol edin.";
                 printLog("✕ Supabase Bağlantısı Kesildi: " + err.message, 'error');
                 alert("✕ SUPABASE BAĞLANTI HATASI:\n" + err.message + hint);
             }
         }
 
-        // ── GEMİNİ ZİNCİR MOTORU — DOĞRUSAL SIRA GARANTİLİ ─────────────────────────────
+        // ── GEMİNİ ZİNCİR MOTORU — ÜSTEL RETRY VE GERİ ÇEKİLME GÜVENCELİ ─────────────────────────────
 
         async function executeGeminiRequest(bodyPayload, key) {
             const modelsChain = [
@@ -275,37 +275,60 @@
                 'gemini-1.5-flash'
             ];
             
-            // Teşhis Göstergesi: Tarayıcının yeni kodu okuyup okumadığını loğdan kesinleştirir
             printLog(`[SİSTEM] Başlatılan Yapay Zeka Sıralama Zinciri: ${modelsChain.join(' ➔ ')}`, 'info');
+            const MAX_ATTEMPTS_PER_MODEL = 3; 
+            const BASE_WAIT_MS = 2500; // Yoğunluk durumunda beklenecek taban süre (2.5 saniye)
             let lastError = null;
 
             for (const currentModel of modelsChain) {
-                try {
-                    printLog(`[AI] ${currentModel} tüneli aktif ediliyor, sinyal gönderildi...`, 'info');
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key.trim()}`;
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(bodyPayload)
-                    });
-
-                    if (response.ok) {
-                        printLog(`[AI] ✓ ${currentModel} hattı sinyali başarıyla onayladı.`, 'success');
-                        return await response.json();
-                    }
-
-                    let errText = `HTTP ${response.status}`;
+                let currentDelay = BASE_WAIT_MS;
+                
+                for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
                     try {
-                        const errJson = await response.json();
-                        errText = errJson?.error?.message || JSON.stringify(errJson);
-                    } catch (_) {}
+                        printLog(`[AI] ${currentModel} tüneli aktif ediliyor (Deneme ${attempt}/${MAX_ATTEMPTS_PER_MODEL})...`, 'info');
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key.trim()}`;
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(bodyPayload)
+                        });
 
-                    printLog(`[AI] ✕ ${currentModel} geçilemedi (${response.status}): ${errText}`, 'error');
-                    lastError = new Error(`[${currentModel}] ${errText}`);
-                } catch (networkErr) {
-                    printLog(`[AI] ✕ ${currentModel} ağ bağlantı kesintisi: ${networkErr.message}`, 'error');
-                    lastError = networkErr;
+                        if (response.ok) {
+                            printLog(`[AI] ✓ ${currentModel} hattı sinyali başarıyla onayladı.`, 'success');
+                            return await response.json();
+                        }
+
+                        let errText = `HTTP ${response.status}`;
+                        try {
+                            const errJson = await response.json();
+                            errText = errJson?.error?.message || JSON.stringify(errJson);
+                        } catch (_) {}
+
+                        lastError = new Error(`[${currentModel}] ${errText}`);
+                        printLog(`[AI] ✕ ${currentModel} hata kodu döndürdü (${response.status}): ${errText}`, 'error');
+
+                        // Geliştirilmiş Geçici Yoğunluk Filtresi (503 ve 429 için Akıllı Bekleme)
+                        const isTransientError = response.status === 429 || response.status === 503 || /exhausted|quota|overloaded|capacity|demand/i.test(errText);
+                        
+                        if (isTransientError && attempt < MAX_ATTEMPTS_PER_MODEL) {
+                            printLog(`[AI] Sunucu kısıtlaması algılandı (HTTP ${response.status}). ${currentDelay / 1000}sn beklenip yeniden denenecek...`, 'info');
+                            await new Promise(r => setTimeout(r, currentDelay));
+                            currentDelay *= 2; // Bekleme süresini ikiye katla (Exponential Backoff)
+                            continue; // Aynı model için bir sonraki denemeye geç
+                        }
+                        
+                        // Eğer hata 503/429 değilse veya deneme hakkı bittiyse iç döngüden çık, sonraki modele atla
+                        break; 
+                    } catch (networkErr) {
+                        printLog(`[AI] ✕ ${currentModel} ağ bağlantı hatası: ${networkErr.message}`, 'error');
+                        lastError = networkErr;
+                        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+                            await new Promise(r => setTimeout(r, currentDelay));
+                            currentDelay *= 2;
+                        }
+                    }
                 }
+                printLog(`[AI] ➔ ${currentModel} hattı geçilemedi. Zincirdeki bir sonraki güvenli hatta aktarılıyor...`, 'info');
             }
             throw lastError || new Error('Tüm tünel hatları meşgul.');
         }
