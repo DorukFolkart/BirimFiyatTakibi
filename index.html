@@ -431,15 +431,11 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             finally { btn.disabled = false; btn.style.opacity = "1"; setStatusBadge('connected'); }
         }
 
-        // ── 🛠️ YENİ EKLEMELİ KATMAN: AKILLI MOUSE VE GÖSTERGE MOTORU ───────────────────
-
         function hideSuggestionsBox() {
-            // Fare kapsayıcı div'den ayrılınca dropdown'ı tamamen görünmez yapar
             document.getElementById('suggestions_box').classList.add('hidden');
         }
 
         function showSuggestionsBox() {
-            // Fare kutuya gelince veya tıklayınca (içerik varsa) dropdown'ı tekrar gösterir
             const term = document.getElementById('search_poz').value.trim();
             const box = document.getElementById('suggestions_box');
             if (term.length >= 2 && box.children.length > 0) {
@@ -480,7 +476,14 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 
                 if (!seenKeys.has(uniqueKey)) {
                     seenKeys.add(uniqueKey);
-                    uniqueItems.push({ original_code: item.item_code, original_name: item.item_name, clean_name: cleanName, clean_project: cleanProj });
+                    // 🛠️ Checkbox veri setine eşleştirme yapacağımız temizlenmiş kod, isim ve proje parametrelerini gömüyoruz
+                    uniqueItems.push({ 
+                        original_code: item.item_code, 
+                        original_name: item.item_name, 
+                        clean_code: cleanCode,
+                        clean_name: cleanName, 
+                        clean_project: cleanProj 
+                    });
                 }
             });
 
@@ -495,6 +498,11 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 chk.type = "checkbox";
                 chk.className = "rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer";
                 chk.value = item.original_code;
+                
+                // Grafik doğrulaması için dataset kilitleri
+                chk.dataset.code = item.clean_code;
+                chk.dataset.name = item.clean_name;
+                chk.dataset.project = item.clean_project;
 
                 const lbl = document.createElement('span');
                 lbl.className = "text-slate-200 flex-1 select-none pointer-events-none text-left font-medium";
@@ -523,7 +531,7 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             return new Date(s).getTime() || 0;
         }
 
-        // ── GRAFİK MOTORU ───────────────────
+        // ── GRAFİK MOTORU (PROJELERİN KARIŞMA HATASI GİDERİLDİ) ───────────────────
 
         async function fetchPozHistory() {
             const checkedBoxes = document.querySelectorAll('#suggestions_box input[type="checkbox"]:checked');
@@ -534,9 +542,22 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
 
             const { data } = await supabaseClient.from('v_indexed_contract_items').select('*').in('item_code', selectedCodes);
 
+            // 🛠️ KESİN ÇÖZÜM FİLTRESİ: Supabase'den gelen verileri elinle işaretlediğin Checkbox'ların Name ve Project kombinasyonuna göre %100 süzüyoruz.
+            const filteredData = data.filter(d => {
+                const dCode = String(d.item_code || '').replace(/ÖBF\s*/gi, "").replace(/[\(\]][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
+                const dName = String(d.item_name || '').replace(/\s+/g, " ").replace(/[\(\]][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
+                const dProj = String(d.project_name || '').replace(/FOLKART\s*/gi, "").trim();
+
+                return Array.from(checkedBoxes).some(cb => 
+                    cb.dataset.code.toLowerCase() === dCode.toLowerCase() &&
+                    cb.dataset.name.toLowerCase() === dName.toLowerCase() &&
+                    cb.dataset.project.toLowerCase() === dProj.toLowerCase()
+                );
+            });
+
             const groups = {};
-            data.forEach(d => {
-                const cleanName = String(d.item_name || '').replace(/ÖBF\s*/gi, "").replace(/[\(\[][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").replace(/\s+/g, " ").trim();
+            filteredData.forEach(d => {
+                const cleanName = String(d.item_name || '').replace(/ÖBF\s*/gi, "").replace(/[\(\]][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").replace(/\s+/g, " ").trim();
                 const cleanProj = String(d.project_name || '').replace(/FOLKART\s*/gi, "").trim();
                 const displayLabel = `${cleanName} - ${cleanProj}`;
                 if (!groups[displayLabel]) groups[displayLabel] = [];
@@ -544,7 +565,7 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             });
 
             const allDatesSet = new Set();
-            data.forEach(d => allDatesSet.add(extractDateOnly(d.price_date || d.contract_date)));
+            filteredData.forEach(d => allDatesSet.add(extractDateOnly(d.price_date || d.contract_date)));
             const allDates = [...allDatesSet].sort((a, b) => parseTrDate(a) - parseTrDate(b));
 
             const COLORS = ['#f59e0b','#3b82f6','#10b981','#f43f5e','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
