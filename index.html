@@ -13,6 +13,7 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
 
+        <!-- ── KİMLİK BİLGİLERİ ─────────────────────────────────────────── -->
         <div class="bg-slate-800 p-4 rounded-xl border border-dashed border-slate-700 space-y-4 text-xs">
             <div id="cred-warning" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-lg">
                 ⚠ Bu cihazda veya bu adreste kayıtlı kimlik bilgisi bulunamadı. Aşağıdaki alanları doldurun — yazarken otomatik bağlanılacaktır.
@@ -45,6 +46,7 @@
             </div>
         </div>
 
+        <!-- ── BAŞLIK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
@@ -55,6 +57,7 @@
             </div>
         </div>
 
+        <!-- ── LOG ───────────────────────────────────────────────────────── -->
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
             <div class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
@@ -65,6 +68,7 @@
             </div>
         </div>
 
+        <!-- ── FORM + DOSYA ───────────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
                 <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">1. Üst Sözleşme Bilgileri</h2>
@@ -104,6 +108,7 @@
             </div>
         </div>
 
+        <!-- ── GRAFİK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-6">
             <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">3. Poz Bazlı Akıllı Analiz ve Revizyon Grafiği</h2>
             <div class="space-y-1">
@@ -113,6 +118,7 @@
                             placeholder="İmalat adı veya poz numarası yazın (örn: boya, sıva, zemin, duvar)"
                             class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                         
+                        <!-- Dropdown Seçim Menü Kutusu -->
                         <div id="suggestions_box" class="absolute left-0 right-0 z-50 mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-60 overflow-y-auto hidden space-y-1 shadow-2xl">
                         </div>
                     </div>
@@ -429,7 +435,7 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // ── AI ANALİZ + KAYDET (MÜKERRER KONTROLÜ ENTEGRE EDİLDİ) ───────────────────────────────────────
+        // ── AI ANALİZ + KAYDET ───────────────────────────────────────
 
         async function sendToAIAndSave() {
             if (!supabaseClient) initSupabase();
@@ -450,15 +456,12 @@
                 return alert("Lütfen tüm form alanlarını doldurun ve bir Excel dosyası seçin!");
             }
 
-            // ── YENİ EKLEMELİ KATMAN: VERİTABANI MÜKERRER DOSYA KONTROLÜ ──
-            // Gemini tüneline girmeden önce bütçe ve kota koruması için önce veritabanı taranır
             printLog("1/6: Mükerrer dosya/sözleşme kontrolü yapılıyor...", 'info');
             try {
                 const { data: checkProj } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
                 const { data: checkComp } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
 
                 if (checkProj && checkProj.length > 0 && checkComp && checkComp.length > 0) {
-                    // Eğer proje ve firma veritabanında varsa, bu tarihe ait daha önce açılmış sözleşme var mı?
                     const { data: exContract } = await supabaseClient.from('contracts')
                         .select('id')
                         .eq('project_id', checkProj[0].id)
@@ -570,7 +573,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             }
         }
 
-        // ── DROPDOWN İÇERİSİNDE ÇİFT KAYITLARI/SAYILI PARANTEZLERİ ERİTEN VE PROJE ADINI BAĞLAYAN MOTOR ───────────────────
+        // ── DROPDOWN İÇERİSİNDEKİ PARANTEZLİ SAYILARI KAZIYAN SORGULAMA MOTORU ───────────────────
 
         async function searchPozOptions() {
             const term = document.getElementById('search_poz').value.trim();
@@ -600,8 +603,9 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             const seenKeys = new Set();
             
             data.forEach(item => {
-                const cleanCode = String(item.item_code || '').replace(/ÖBF\s*/gi, "").replace(/\(\s*\d+\s*\)/g, "").trim();
-                const cleanName = String(item.item_name || '').replace(/\s+/g, " ").replace(/\(\s*\d+\s*\)/g, "").trim();
+                // Kökten Temizlik: Tüm ÖBF ibarelerini ve parantez/köşeli parantez içindeki sayı kalıntılarını temizler.
+                const cleanCode = String(item.item_code || '').replace(/ÖBF\s*/gi, "").replace(/[\(\[][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
+                const cleanName = String(item.item_name || '').replace(/\s+/g, " ").replace(/[\(\[][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
                 const cleanProj = String(item.project_name || '').replace(/FOLKART\s*/gi, "").trim(); 
                 
                 const uniqueKey = `${cleanCode}-${cleanName}-${cleanProj}`.toLowerCase();
@@ -633,11 +637,8 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                 const lbl = document.createElement('span');
                 lbl.className = "text-slate-200 flex-1 select-none pointer-events-none text-left font-medium";
                 
-                if (item.clean_code && item.clean_code !== "-") {
-                    lbl.innerHTML = `<strong class="text-amber-500">[${item.clean_code}]</strong> ${item.clean_name} - <span class="text-blue-400 font-semibold">${item.clean_project}</span>`;
-                } else {
-                    lbl.innerHTML = `${item.clean_name} - <span class="text-blue-400 font-semibold">${item.clean_project}</span>`;
-                }
+                // DÜZELTME: "[]" içerisindeki tüm sayısal kodlar ve ön ekler kilitlenerek tamamen kaldırıldı.
+                lbl.innerHTML = `${item.clean_name} - <span class="text-blue-400 font-semibold">${item.clean_project}</span>`;
 
                 div.onclick = (e) => {
                     if (e.target !== chk) {
@@ -674,7 +675,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             return new Date(s).getTime() || 0;
         }
 
-        // ── GRAFİK MOTORU KATMANI ───────────────────
+        // ── KOD KALINTILARINDAN ARINDIRILMIŞ AKILLI GRAFİK MOTORU ───────────────────
 
         async function fetchPozHistory() {
             const checkedBoxes = document.querySelectorAll('#suggestions_box input[type="checkbox"]:checked');
@@ -701,20 +702,14 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
 
             const groups = {};
             data.forEach(d => {
+                // DÜZELTME: Grafikteki çizgilerin lejant başlıklarında da parantez/köşeli parantez içi sayılar tamamen elendi.
                 const rawName = d.item_name || 'Bilinmeyen';
-                const rawCode = d.item_code || '';
                 const rawProj = d.project_name || '';
                 
-                const cleanCode = String(rawCode).replace(/ÖBF\s*/gi, "").replace(/\(\s*\d+\s*\)/g, "").trim();
-                const cleanName = String(rawName).replace(/ÖBF\s*/gi, "").replace(/\(\s*\d+\s*\)/g, "").replace(/\s+/g, " ").trim();
+                const cleanName = String(rawName).replace(/ÖBF\s*/gi, "").replace(/[\(\[][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").replace(/\s+/g, " ").trim();
                 const cleanProj = String(rawProj).replace(/FOLKART\s*/gi, "").trim();
                 
-                let displayLabel = "";
-                if (cleanCode && cleanCode !== "-") {
-                    displayLabel = `[${cleanCode}] ${cleanName} - ${cleanProj}`;
-                } else {
-                    displayLabel = `${cleanName} - ${cleanProj}`;
-                }
+                const displayLabel = `${cleanName} - ${cleanProj}`;
                 
                 if (!groups[displayLabel]) groups[displayLabel] = [];
                 groups[displayLabel].push(d);
