@@ -138,7 +138,7 @@
                     <canvas id="historyChart"></canvas>
                 </div>
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-80">
-                    <div class="text-xs font-semibold text-slate-400 mb-2 tracking-wider uppercase text-amber-500">USD (Dolar) Bazlı Maliyet Trendi</div>
+                    <div class="text-xs font-semibold text-amber-500 mb-2 tracking-wider uppercase">USD (Dolar) Bazlı Maliyet Trendi</div>
                     <canvas id="usdHistoryChart"></canvas>
                 </div>
             </div>
@@ -149,7 +149,7 @@
         let supabaseClient = null;
         let rawExcelTextDump = "";
         let chartInstance = null;
-        let usdChartInstance = null; // 🛠️ USD Grafik Hafıza Değişkeni
+        let usdChartInstance = null;
 
         // ── YARDIMCI FONKSİYONLAR ────────────────────────────────────────────
 
@@ -374,7 +374,6 @@
                     });
                     rawExcelTextDump = optimizedText;
 
-                    // FIX: Proje adını büyük harfe zorlama (Mükerrerlik Koruması)
                     if (autoProj) document.getElementById('project_name').value = autoProj.toLocaleUpperCase('tr-TR');
                     document.getElementById('company_name').value = autoComp || "";
                     document.getElementById('effective_date').value = "";
@@ -391,7 +390,6 @@
             const GEMINI_API_KEY = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!supabaseClient || !GEMINI_API_KEY) return alert("Lütfen anahtarları doldurun.");
 
-            // FIX: Proje adını büyük harf ile işle (Mükerrerlik Koruması)
             const projName = document.getElementById('project_name').value.trim().toLocaleUpperCase('tr-TR');
             const compName = document.getElementById('company_name').value.trim();
             const effDate  = document.getElementById('effective_date').value;
@@ -500,7 +498,6 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             box.classList.remove('hidden');
 
             uniqueItems.forEach(item => {
-                // Veritabanındaki hatalı 'Terra' verilerini frontend arayüz listesinden eliyoruz
                 if (item.clean_project === "Terra") return;
 
                 const div = document.createElement('div');
@@ -542,52 +539,47 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             return new Date(s).getTime() || 0;
         }
 
-        // ── 🛠️ YENİ: MERKEZ BANKASI / SERBEST PİYASA DÖVİZ KURU ÇEVİRİCİ MOTORU ──
+        // ── 🛠️ FIX: GERÇEK GEÇMİŞ TARİH ARŞİV KURU ÇEVİRİCİ MOTORU ──
         async function fetchUSDExchangeRate(rateType, dateStr) {
             try {
-                if (rateType === 'today') {
-                    // Bugünün anlık canlı kurları (CORS Korumalı Açık Servis)
-                    const res = await fetch('https://open.er-api.com/v6/latest/TRY');
-                    if (!res.ok) return 0.030; // Hata durumunda güvenli fallback çarpanı
-                    const currencyData = await res.json();
-                    return currencyData.rates.USD || 0.030; 
-                } else {
-                    // Geçmiş sözleşme/hakediş tarihindeki kur (YYYY-MM-DD formatında)
+                let url = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/try.json';
+                
+                // DÜZELTME: Eğer geçmiş kur isteniyorsa adresi jsDelivr tarih arşivi dizesine dinamik mapliyoruz
+                if (rateType === 'historical' && dateStr) {
                     let formattedDate = dateStr;
                     if (dateStr.includes('.')) {
                         const parts = dateStr.split('.');
-                        formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                        formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD formatı kilitlendi
                     }
-                    const res = await fetch(`https://open.er-api.com/v6/latest/TRY`); 
-                    // Not: Derin geçmiş kurlar için ücretli API key gerekmemesi adına 
-                    // ya da veritabanında kur yoksa anlık serbest piyasa simülasyonu çalıştırılır.
-                    if (!res.ok) return 0.030;
-                    const currencyData = await res.json();
-                    
-                    // Sözleşme tarihine göre kur eğrisi simülasyon fallback'i (Mühendislik Yaklaşımı)
-                    const year = parseInt(formattedDate.split('-')[0]) || 2026;
-                    if (year <= 2024) return 0.033;
-                    if (year === 2025) return 0.031;
-                    return currencyData.rates.USD; 
+                    url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${formattedDate}/v1/currencies/try.json`;
                 }
+                
+                const res = await fetch(url);
+                if (!res.ok) {
+                    // Ana CDN meşgulse canlı piyasa yedek hattına bağlan
+                    const fallbackRes = await fetch('https://open.er-api.com/v6/latest/TRY');
+                    const fbData = await fallbackRes.json();
+                    return fbData.rates.USD || 0.029;
+                }
+                const data = await res.json();
+                return data.try?.usd || 0.029; // 1 TL = X USD çarpanı döner
             } catch (e) {
-                return 0.030; // Bağlantı koparsa grafiği çökertmemek için default kur çarpanı
+                return 0.029;
             }
         }
 
-        // ── ÇİFT GRAFİKLİ GELİŞMİŞ GRAFİK MOTORU ───────────────────
+        // ── ÇİFT TREND GRAFİK MOTORU ───────────────────
 
         async function fetchPozHistory() {
             const checkedBoxes = document.querySelectorAll('#suggestions_box input[type="checkbox"]:checked');
             if (checkedBoxes.length === 0) return alert("Lütfen önce listeden en az bir imalat kalemi işaretleyin.");
 
             const selectedCodes = Array.from(checkedBoxes).map(cb => cb.value);
-            const usdRateType = document.getElementById('usd_rate_type').value; // Tarih tipi seçimi
+            const usdRateType = document.getElementById('usd_rate_type').value;
 
             if (!supabaseClient) initSupabase();
             const { data } = await supabaseClient.from('v_indexed_contract_items').select('*').in('item_code', selectedCodes);
 
-            // Çapraz proje veri doğrulama koruması
             const filteredData = data.filter(d => {
                 const dCode = String(d.item_code || '').replace(/ÖBF\s*/gi, "").replace(/[\(\]][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
                 const dName = String(d.item_name || '').replace(/\s+/g, " ").replace(/[\(\]][^\]\)]*\d+[^\]\)]*[\)\]]/g, "").trim();
@@ -612,8 +604,8 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
             filteredData.forEach(d => allDatesSet.add(extractDateOnly(d.price_date || d.contract_date)));
             const allDates = [...allDatesSet].sort((a, b) => parseTrDate(a) - parseTrDate(b));
 
-            // 🛠️ YENİ: Seçilen kur tipine göre API'den Dolar dönüşüm çarpanlarını çekiyoruz
-            printLog("Döviz kurları API üzerinden otonom çözümleniyor...", 'info');
+            // DÜZELTME: Seçilen her bir tarih hücresi için arşive gidip o günkü gerçek kuru haritalandırıyoruz
+            printLog("Dinamik döviz kurları arşiv tünelinden çözümleniyor...", 'info');
             const ratesMap = {};
             for (const dStr of allDates) {
                 ratesMap[dStr] = await fetchUSDExchangeRate(usdRateType, dStr);
@@ -621,7 +613,6 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
 
             const COLORS = ['#f59e0b','#3b82f6','#10b981','#f43f5e','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 
-            // 1. GRAFİK DATASETİ: TL BAZLI VERİ SETİ
             const datasetsTl = Object.keys(groups).map((displayLabel, i) => {
                 const priceByDate = {};
                 groups[displayLabel].forEach(d => {
@@ -636,14 +627,13 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 };
             });
 
-            // 2. GRAFİK DATASETİ: USD (DOLAR) BAZLI VERİ SETİ
             const datasetsUsd = Object.keys(groups).map((displayLabel, i) => {
                 const priceByDateUsd = {};
                 groups[displayLabel].forEach(d => {
                     const dateKey = extractDateOnly(d.price_date || d.contract_date);
                     const tlPrice = parseFloat(d.current_indexed_price_tl || d.unit_price_tl || 0);
-                    // TL Fiyatını çekilen Dolar kuru çarpanıyla çarpıp dolara çeviriyoruz
-                    priceByDateUsd[dateKey] = parseFloat((tlPrice * (ratesMap[dateKey] || 0.03)).toFixed(2));
+                    // DÜZELTME: Her tarih noktası o güne ait çekilen spesifik kur çarpanıyla (ratesMap[dateKey]) çarpılır!
+                    priceByDateUsd[dateKey] = parseFloat((tlPrice * (ratesMap[dateKey] || 0.029)).toFixed(2));
                 });
                 const color = COLORS[i % COLORS.length];
                 return {
@@ -653,7 +643,6 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 };
             });
 
-            // ── TL GRAFİĞİNİ ÇİZ ──
             if (chartInstance) chartInstance.destroy();
             const ctxTl = document.getElementById('historyChart').getContext('2d');
             chartInstance = new Chart(ctxTl, {
@@ -671,7 +660,6 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 }
             });
 
-            // ── 🛠️ YENİ: USD GRAFİĞİNİ ÇİZ ──
             if (usdChartInstance) usdChartInstance.destroy();
             const ctxUsd = document.getElementById('usdHistoryChart').getContext('2d');
             usdChartInstance = new Chart(ctxUsd, {
@@ -689,7 +677,7 @@ Bana şu yapıda JSON üret: {"items": [{"item_code": "KOD", "item_name": "ADI",
                 }
             });
 
-            printLog(`✓ Çift Trend Analizi Eşzamanlı Çizildi.`, 'success');
+            printLog(`✓ Çift Trend Analizi Gerçek Döviz Arşiviyle Yeniden Çizildi.`, 'success');
             document.getElementById('suggestions_box').classList.add('hidden');
         }
     </script>
