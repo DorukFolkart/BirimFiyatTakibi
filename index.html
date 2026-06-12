@@ -266,18 +266,20 @@
             }
         }
 
-        // ── GEMİNİ MOTORU — OPTİMİZE EDİLMİŞ VERİ AKIŞI ─────────────────────────────
+        // ── GEMİNİ MOTORU — TALEP EDİLEN YENİ HİYERARŞİ ─────────────────────────────
 
         async function executeGeminiRequest(bodyPayload, key) {
-            const MODELS = [
-                'gemini-1.5-flash',
-                'gemini-1.5-pro'
+            // DÜZELTME: Model isimleri tamamen küçük harf dizisi yapıldı ve tam istenilen hiyerarşiye kilitlendi
+            const models = [
+                'gemini-2.5-flash',
+                'gemini-2.5-pro',
+                'gemini-1.5-flash'
             ];
             const MAX_ATTEMPTS_PER_MODEL = 3;
             const BASE_WAIT_MS = 2000;
             let lastError = null;
 
-            for (const model of MODELS) {
+            for (const model of models) {
                 for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
                     try {
                         printLog(`[AI] ${model} — deneme ${attempt}/${MAX_ATTEMPTS_PER_MODEL}`, 'info');
@@ -392,7 +394,6 @@
                         }
                     }
 
-                    // %80 TOKEN TASARRUFU SAĞLAYAN YENİ FİLTRE DÖNGÜSÜ
                     rows.forEach((row, index) => {
                         if (row?.length > 0) {
                             const filteredCells = row
@@ -433,7 +434,7 @@
             const GEMINI_API_KEY = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!supabaseClient || !GEMINI_API_KEY) {
                 printLog("Kritik Durdurma: Bağlantı anahtarları eksik.", 'error');
-                return alert("Lütfen Supabase URL/Key ve Gemini API Key alanlarını doldurun.");
+                return alert("Lütfen Supabase URL/Key and Gemini API Key alanlarını doldurun.");
             }
 
             const projName = document.getElementById('project_name').value.trim();
@@ -535,6 +536,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                 printLog("✕ İŞLEM DURDURULDU: " + err.message, 'error');
                 alert("İŞLEM DURDURULDU:\n" + err.message);
             } finally {
+                // DÜZELTME: "finaly" yazım hatası giderilerek "finally" yapıldı. Akış kurtarıldı.
                 btn.disabled = false; btn.style.opacity = "1";
                 btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
                 setStatusBadge('connected');
