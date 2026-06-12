@@ -108,14 +108,19 @@
             <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">3. Poz Bazlı Akıllı Analiz ve Revizyon Grafiği</h2>
             <div class="space-y-1">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input type="text" id="search_poz"
-                        placeholder="Poz kodu veya imalat adı (örn: ÖBF (1), boya, zemin)"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 md:col-span-2">
-                    <button onclick="fetchPozHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-sm transition-colors cursor-pointer">
+                    <div class="relative md:col-span-2">
+                        <input type="text" id="search_poz" oninput="searchPozOptions()"
+                            placeholder="İmalat adı veya poz kodu yazın (örn: boya, sıva, zemin, duvar)"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                        
+                        <div id="suggestions_box" class="absolute left-0 right-0 z-50 mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-60 overflow-y-auto hidden space-y-1 shadow-2xl">
+                            </div>
+                    </div>
+                    <button onclick="fetchPozHistory()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-2 rounded-lg text-sm transition-colors cursor-pointer h-[38px]">
                         Fiyat Değişim Trendini Çiz
                     </button>
                 </div>
-                <p class="text-xs text-slate-600">Poz kodu (ÖBF-3) veya imalat adı (boya, sıva, zemin vb.) girebilirsiniz. Birden fazla eşleşme varsa her poz ayrı çizgide gösterilir.</p>
+                <p class="text-xs text-slate-500">Metin girdikçe açılan menüden kalemleri elinizle manuel seçebilir, birden fazla kalemi işaretleyerek grafikte karşılaştırabilirsiniz.</p>
             </div>
             <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 h-80">
                 <canvas id="historyChart"></canvas>
@@ -266,7 +271,7 @@
             }
         }
 
-        // ── GEMİNİ ZİNCİR MOTORU — ÜSTEL RETRY VE GERİ ÇEKİLME GÜVENCELİ ─────────────────────────────
+        // ── GEMİNİ ZİNCİR MOTORU ──────────────────────────────────────────────────────────
 
         async function executeGeminiRequest(bodyPayload, key) {
             const modelsChain = [
@@ -277,7 +282,7 @@
             
             printLog(`[SİSTEM] Başlatılan Yapay Zeka Sıralama Zinciri: ${modelsChain.join(' ➔ ')}`, 'info');
             const MAX_ATTEMPTS_PER_MODEL = 3; 
-            const BASE_WAIT_MS = 2500; // Yoğunluk durumunda beklenecek taban süre (2.5 saniye)
+            const BASE_WAIT_MS = 2500; 
             let lastError = null;
 
             for (const currentModel of modelsChain) {
@@ -307,17 +312,14 @@
                         lastError = new Error(`[${currentModel}] ${errText}`);
                         printLog(`[AI] ✕ ${currentModel} hata kodu döndürdü (${response.status}): ${errText}`, 'error');
 
-                        // Geliştirilmiş Geçici Yoğunluk Filtresi (503 ve 429 için Akıllı Bekleme)
                         const isTransientError = response.status === 429 || response.status === 503 || /exhausted|quota|overloaded|capacity|demand/i.test(errText);
                         
                         if (isTransientError && attempt < MAX_ATTEMPTS_PER_MODEL) {
                             printLog(`[AI] Sunucu kısıtlaması algılandı (HTTP ${response.status}). ${currentDelay / 1000}sn beklenip yeniden denenecek...`, 'info');
                             await new Promise(r => setTimeout(r, currentDelay));
-                            currentDelay *= 2; // Bekleme süresini ikiye katla (Exponential Backoff)
-                            continue; // Aynı model için bir sonraki denemeye geç
+                            currentDelay *= 2; 
+                            continue; 
                         }
-                        
-                        // Eğer hata 503/429 değilse veya deneme hakkı bittiyse iç döngüden çık, sonraki modele atla
                         break; 
                     } catch (networkErr) {
                         printLog(`[AI] ✕ ${currentModel} ağ bağlantı hatası: ${networkErr.message}`, 'error');
@@ -350,7 +352,7 @@
             }
         }
 
-        // ── EXCEL YÜKLEME — VERİ SIKIŞTIRMA MOTORU ────────────────────────────────────
+        // ── EXCEL YÜKLEME ────────────────────────────────────────────────────
 
         function loadExcelToText(event) {
             const file = event.target.files[0];
@@ -543,6 +545,75 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             }
         }
 
+        // ── FIX-1: SEÇENEKLERİ LİSTELEYEN AKILLI SORGULAMA MOTORU ───────────────────────────────────
+
+        async function searchPozOptions() {
+            const term = document.getElementById('search_poz').value.trim();
+            const box = document.getElementById('suggestions_box');
+            
+            if (term.length < 2) {
+                box.innerHTML = "";
+                box.classList.add('hidden');
+                return;
+            }
+
+            if (!supabaseClient) initSupabase();
+            if (!supabaseClient) return;
+
+            // Hem koda hem imalat ismine göre veritabanından anlık çekim yapar
+            const { data, error } = await supabaseClient
+                .from('v_indexed_contract_items')
+                .select('item_code, item_name')
+                .or(`item_code.ilike.%${term}%,item_name.ilike.%${term}%`);
+
+            if (error || !data || data.length === 0) {
+                box.innerHTML = `<p class="text-xs text-slate-500 p-2">Eşleşen imalat kalemi bulunamadı.</p>`;
+                box.classList.remove('hidden');
+                return;
+            }
+
+            // Mükerrer (aynı poz kodu ve ismi) olan satırları filtreler
+            const uniqueItems = [];
+            const seenKeys = new Set();
+            data.forEach(item => {
+                const key = `${item.item_code}-${item.item_name}`.trim();
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    uniqueItems.push(item);
+                }
+            });
+
+            box.innerHTML = "";
+            box.classList.remove('hidden');
+
+            // Listeye her bir benzersiz kalemi Checkbox ile basar
+            uniqueItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "flex items-center gap-3 p-2 hover:bg-slate-800 rounded cursor-pointer text-xs transition-all border-b border-slate-900/40";
+                
+                const chk = document.createElement('input');
+                chk.type = "checkbox";
+                chk.className = "rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer";
+                chk.value = item.item_code;
+                chk.dataset.name = item.item_name; // Grafik lejantı için ismi hafızada tutuyoruz
+
+                const lbl = document.createElement('span');
+                lbl.className = "text-slate-200 flex-1 select-none pointer-events-none";
+                lbl.innerHTML = `<strong class="text-amber-500">[${item.item_code}]</strong> ${item.item_name}`;
+
+                div.onclick = (e) => {
+                    if (e.target !== chk) {
+                        chk.checked = !chk.checked;
+                    }
+                };
+                chk.onclick = (e) => { e.stopPropagation(); };
+
+                div.appendChild(chk);
+                div.appendChild(lbl);
+                box.appendChild(div);
+            });
+        }
+
         // ── TARİH AYIKLA ─────────────────────────────────────────────────────
 
         function extractDateOnly(raw) {
@@ -565,36 +636,38 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             return new Date(s).getTime() || 0;
         }
 
-        // ── GRAFİK ───────────────────────────────────────────────────────────
+        // ── FIX-2: SEÇİLEN KALEMLERİN İSİMLERİNİ LEJANTTA GÖSTEREN SORGULAMA MOTORU ───────────────────
 
         async function fetchPozHistory() {
-            const term = document.getElementById('search_poz').value.trim();
-            if (!term) return alert("Lütfen bir poz kodu veya imalat adı girin.");
+            // İşaretlenmiş tüm checkbox elemanlarını yakalar
+            const checkedBoxes = document.querySelectorAll('#suggestions_box input[type="checkbox"]:checked');
+            if (checkedBoxes.length === 0) {
+                return alert("Lütfen önce arama kutusunun altında açılan menüden en az bir imalat kalemi işaretleyin.");
+            }
+
+            const selectedCodes = Array.from(checkedBoxes).map(cb => cb.value);
 
             if (!supabaseClient) initSupabase();
-            if (!supabaseClient) return alert("Supabase bağlantısı yok.\n\nLütfen üst kısımdaki Supabase URL ve Key alanlarını doldurun.");
+            if (!supabaseClient) return alert("Supabase bağlantısı yok.");
 
-            printLog(`"${term}" için poz/imalat adı araması yapılıyor...`, 'info');
+            printLog(`Seçilen ${selectedCodes.length} kalemin fiyat geçmiş haritası çıkarılıyor...`, 'info');
 
             const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
                 .select('*')
-                .or(`item_code.ilike.%${term}%,item_name.ilike.%${term}%`);
+                .in('item_code', selectedCodes);
 
             if (error) {
                 printLog(`Veritabanı Hatası: ${error.message}`, 'error');
                 return alert("Veritabanı sorgusu başarısız:\n" + error.message);
             }
-            if (!data || data.length === 0) {
-                printLog(`"${term}" ile eşleşen kayıt bulunamadı.`, 'error');
-                return alert(`"${term}" ile eşleşen poz veya imalat kaydı bulunamadı.`);
-            }
 
+            // FIX-2: Kod yerine doğrudan imalat ismine (item_name) göre gruplama tetiklendi
             const groups = {};
             data.forEach(d => {
-                const code = (d.item_code || 'Bilinmeyen').trim();
-                if (!groups[code]) groups[code] = [];
-                groups[code].push(d);
+                const name = (d.item_name || 'Bilinmeyen').trim();
+                if (!groups[name]) groups[name] = [];
+                groups[name].push(d);
             });
 
             const allDatesSet = new Set();
@@ -603,15 +676,15 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
 
             const COLORS = ['#f59e0b','#3b82f6','#10b981','#f43f5e','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 
-            const datasets = Object.keys(groups).map((code, i) => {
+            const datasets = Object.keys(groups).map((name, i) => {
                 const priceByDate = {};
-                groups[code].forEach(d => {
+                groups[name].forEach(d => {
                     const dateKey = extractDateOnly(d.price_date || d.contract_date);
                     priceByDate[dateKey] = parseFloat(d.current_indexed_price_tl || d.unit_price_tl || 0);
                 });
                 const color = COLORS[i % COLORS.length];
                 return {
-                    label: code,
+                    label: name, // Grafik lejantına (üst alan) poz kodu yerine tam İmalat Adı basıldı!
                     data: allDates.map(date => priceByDate[date] ?? null),
                     borderColor: color,
                     backgroundColor: color + '18',
@@ -647,7 +720,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                             borderWidth: 1,
                             padding: 10,
                             callbacks: {
-                                title: (items) => `Poz: ${items[0].dataset.label}  |  Tarih: ${items[0].label}`,
+                                title: (items) => `İmalat: ${items[0].dataset.label}  |  Tarih: ${items[0].label}`,
                                 label: (item)  => `Birim Fiyat: ${item.parsed.y.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`,
                                 afterLabel: () => undefined
                             }
@@ -670,7 +743,10 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             });
 
             const kodSayisi = Object.keys(groups).length;
-            printLog(`✓ Grafik çizildi: ${data.length} kayıt / ${kodSayisi} poz kodu / ${allDates.length} tarih noktası.`, 'success');
+            printLog(`✓ Grafik çizildi: ${data.length} kayıt / ${kodSayisi} imalat kalemi / ${allDates.length} tarih noktası.`, 'success');
+            
+            // Seçim yapıldıktan sonra menüyü kapatmak istersen burayı aktif edebilirsin:
+            document.getElementById('suggestions_box').classList.add('hidden');
         }
     </script>
 </body>
