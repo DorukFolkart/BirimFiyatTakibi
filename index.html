@@ -13,7 +13,6 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
 
-        <!-- ── KİMLİK BİLGİLERİ ─────────────────────────────────────────── -->
         <div class="bg-slate-800 p-4 rounded-xl border border-dashed border-slate-700 space-y-4 text-xs">
             <div id="cred-warning" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-lg">
                 ⚠ Bu cihazda veya bu adreste kayıtlı kimlik bilgisi bulunamadı. Aşağıdaki alanları doldurun — yazarken otomatik bağlanılacaktır.
@@ -46,7 +45,6 @@
             </div>
         </div>
 
-        <!-- ── BAŞLIK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
@@ -57,7 +55,6 @@
             </div>
         </div>
 
-        <!-- ── LOG ───────────────────────────────────────────────────────── -->
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
             <div class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
@@ -68,7 +65,6 @@
             </div>
         </div>
 
-        <!-- ── FORM + DOSYA ───────────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
                 <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">1. Üst Sözleşme Bilgileri</h2>
@@ -108,7 +104,6 @@
             </div>
         </div>
 
-        <!-- ── GRAFİK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-6">
             <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">3. Poz Bazlı Akıllı Analiz ve Revizyon Grafiği</h2>
             <div class="space-y-1">
@@ -118,7 +113,6 @@
                             placeholder="İmalat adı veya poz numarası yazın (örn: boya, sıva, zemin, duvar)"
                             class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
                         
-                        <!-- Dropdown Seçim Menü Kutusu -->
                         <div id="suggestions_box" class="absolute left-0 right-0 z-50 mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2 max-h-60 overflow-y-auto hidden space-y-1 shadow-2xl">
                         </div>
                     </div>
@@ -435,10 +429,10 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // ── AI ANALİZ + KAYDET ───────────────────────────────────────────────
+        // ── AI ANALİZ + KAYDET (MÜKERRER KONTROLÜ ENTEGRE EDİLDİ) ───────────────────────────────────────
 
         async function sendToAIAndSave() {
-            initSupabase();
+            if (!supabaseClient) initSupabase();
 
             const GEMINI_API_KEY = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!supabaseClient || !GEMINI_API_KEY) {
@@ -456,10 +450,35 @@
                 return alert("Lütfen tüm form alanlarını doldurun ve bir Excel dosyası seçin!");
             }
 
+            // ── YENİ EKLEMELİ KATMAN: VERİTABANI MÜKERRER DOSYA KONTROLÜ ──
+            // Gemini tüneline girmeden önce bütçe ve kota koruması için önce veritabanı taranır
+            printLog("1/6: Mükerrer dosya/sözleşme kontrolü yapılıyor...", 'info');
+            try {
+                const { data: checkProj } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
+                const { data: checkComp } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
+
+                if (checkProj && checkProj.length > 0 && checkComp && checkComp.length > 0) {
+                    // Eğer proje ve firma veritabanında varsa, bu tarihe ait daha önce açılmış sözleşme var mı?
+                    const { data: exContract } = await supabaseClient.from('contracts')
+                        .select('id')
+                        .eq('project_id', checkProj[0].id)
+                        .eq('company_id', checkComp[0].id)
+                        .eq('contract_date', effDate)
+                        .limit(1);
+
+                    if (exContract && exContract.length > 0) {
+                        printLog("✕ İPTAL DURDURMA: Bu dosya daha önceden yüklenmiştir!", 'error');
+                        return alert("HATA: Bu dosya daha önceden yüklenmiştir!");
+                    }
+                }
+            } catch (checkErr) {
+                printLog("Ön mükerrer kontrolü esnasında SQL uyarısı atlandı: " + checkErr.message, 'info');
+            }
+
             btn.disabled = true; btn.style.opacity = "0.5";
             btn.innerText = "Yapay Zeka Çözümlüyor...";
             setStatusBadge('busy');
-            printLog("1/5: İstek paketi güvenli kanala ulaştırılıyor...", 'info');
+            printLog("2/6: İstek paketi güvenli kanala ulaştırılıyor...", 'info');
 
             const aiPrompt = `Aşağıda düzenlenmiş inşaat keşif metnindeki imalat satırlarını ayıkla.
 Sadece geçerli imalat kalemlerini (poz kodu, imalat adı, birimi, miktarı ve birim fiyatı olanları) çıkar.
@@ -479,7 +498,7 @@ Bana tam olarak şu yapıda geçerli bir JSON objesi üret:
 Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
 
             try {
-                printLog("2/5: Optimize edilmiş veriler tünel üzerinden aktarılıyor...", 'info');
+                printLog("3/6: Optimize edilmiş veriler tünel üzerinden aktarılıyor...", 'info');
                 
                 const result = await executeGeminiRequest({ 
                     contents: [
@@ -488,14 +507,14 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                     generation_config: { response_mime_type: "application/json" }
                 }, GEMINI_API_KEY);
 
-                printLog("3/5: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
+                printLog("4/6: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
                 let aiText = result.candidates[0].content.parts[0].text;
                 const jsonMatch = aiText.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) throw new Error("Yapay zeka yanıtından geçerli bir JSON çıkarılamadı.");
                 const parsedItems = (JSON.parse(jsonMatch[0]).items || []);
                 if (parsedItems.length === 0) throw new Error("Yapay zeka geçerli bir imalat satırı bulamadı.");
 
-                printLog(`4/5: ${parsedItems.length} imalat kalemi filtrelendi. Supabase kayıt kanalı açılıyor...`, 'info');
+                printLog(`5/6: ${parsedItems.length} imalat kalemi filtrelendi. Supabase kayıt kanalı açılıyor...`, 'info');
 
                 let project = null;
                 let { data: pData } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
@@ -524,7 +543,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                     .eq('project_id', project.id).eq('company_id', company.id).order('id', { ascending: false }).limit(1)).data?.[0];
                 if (!contract) throw new Error("Sözleşme ID bağlantısı kurulamadı.");
 
-                printLog("5/5: Pozlar toplu paket halinde sisteme basılıyor...", 'info');
+                printLog("6/6: Pozlar toplu paket halinde sisteme basılıyor...", 'info');
                 const { error: iErr } = await supabaseClient.from('contract_items').insert(
                     parsedItems.map(item => ({
                         contract_id:   contract.id,
@@ -566,7 +585,6 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             if (!supabaseClient) initSupabase();
             if (!supabaseClient) return;
 
-            // FIX: project_name kolonunu da çekiyoruz
             const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
                 .select('item_code, item_name, project_name')
@@ -582,14 +600,10 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             const seenKeys = new Set();
             
             data.forEach(item => {
-                // DÜZELTME 1: Kodlardan ve metinlerden parantez içindeki sayıları (Örn: (7), (8)) tamamen kazıyan Regex
                 const cleanCode = String(item.item_code || '').replace(/ÖBF\s*/gi, "").replace(/\(\s*\d+\s*\)/g, "").trim();
                 const cleanName = String(item.item_name || '').replace(/\s+/g, " ").replace(/\(\s*\d+\s*\)/g, "").trim();
+                const cleanProj = String(item.project_name || '').replace(/FOLKART\s*/gi, "").trim(); 
                 
-                // DÜZELTME 2: Cümlenin sonuna projenin adını yakalıyoruz (Folkart kelimesini sadeleştiriyoruz)
-                const cleanProj = String(item.project_name || '').replace(/FOLKART\s*/gi, "").trim(); // Örn: TERRA veya NARLIDERE
-                
-                // Benzersizlik filtresine projeyi de dahil ediyoruz ki aynı isim iki farklı projede varsa ayrı listelensin
                 const uniqueKey = `${cleanCode}-${cleanName}-${cleanProj}`.toLowerCase();
                 
                 if (!seenKeys.has(uniqueKey)) {
@@ -619,7 +633,6 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
                 const lbl = document.createElement('span');
                 lbl.className = "text-slate-200 flex-1 select-none pointer-events-none text-left font-medium";
                 
-                // Arayüz listesinde parantez içi sayılar kaldırıldı ve sonuna proje ismi eklendi!
                 if (item.clean_code && item.clean_code !== "-") {
                     lbl.innerHTML = `<strong class="text-amber-500">[${item.clean_code}]</strong> ${item.clean_name} - <span class="text-blue-400 font-semibold">${item.clean_project}</span>`;
                 } else {
@@ -688,7 +701,6 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
 
             const groups = {};
             data.forEach(d => {
-                // DÜZELTME: Grafikteki çizgilerin lejant başlıklarında da parantez içi sayıları siliyoruz ve sonuna proje ekliyoruz
                 const rawName = d.item_name || 'Bilinmeyen';
                 const rawCode = d.item_code || '';
                 const rawProj = d.project_name || '';
