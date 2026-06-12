@@ -15,7 +15,7 @@
 
         <div class="bg-slate-800 p-4 rounded-xl border border-dashed border-slate-700 space-y-4 text-xs">
             <div id="cred-warning" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-lg">
-                ⚠ Bu cihazda kayıtlı kimlik bilgisi bulunamadı. Aşağıdaki alanları doldurun — yazarken otomatik bağlanılacaktır.
+                ⚠ Bu cihazda veya bu adreste kayıtlı kimlik bilgisi bulunamadı. Aşağıdaki alanları doldurun — yazarken otomatik bağlanılacaktır.
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -167,23 +167,15 @@
 
         // ── SUPABASE BAŞLATMA ─────────────────────────────────────────────────
 
-        function initSupabase(fromInputs = false) {
-            let url, key;
-            if (fromInputs) {
-                url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
-                key = document.getElementById('cfg_sb_key').value.trim();
-            } else {
-                url = localStorage.getItem('sb_url') || "";
-                key = localStorage.getItem('sb_key') || "";
-                if (!url || url.length < 10) url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
-                if (!key || key.length < 20) key = document.getElementById('cfg_sb_key').value.trim();
-            }
+        function initSupabase() {
+            const url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
+            const key = document.getElementById('cfg_sb_key').value.trim();
 
             if (url && key && url.length > 10 && key.length > 20) {
                 try {
                     supabaseClient = window.supabase.createClient(url, key);
                     setStatusBadge('connected');
-                    printLog("Supabase bağlantısı kuruldu.", 'success');
+                    printLog("Supabase bağlantısı aktif edildi.", 'success');
                     document.getElementById('cred-warning').classList.add('hidden');
                 } catch (e) {
                     supabaseClient = null;
@@ -200,24 +192,24 @@
             const url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
             const key = document.getElementById('cfg_sb_key').value.trim();
             if (url.length > 10 && key.length > 20) {
-                initSupabase(true);
+                initSupabase();
             }
         }
 
         window.onload = function () {
             try {
-                const savedUrl    = localStorage.getItem('sb_url');
-                const savedKey    = localStorage.getItem('sb_key');
-                const savedGemini = localStorage.getItem('gemini_key');
+                const savedUrl    = localStorage.getItem('sb_url') || "";
+                const savedKey    = localStorage.getItem('sb_key') || "";
+                const savedGemini = localStorage.getItem('gemini_key') || "";
 
-                if (savedUrl)    document.getElementById('cfg_sb_url').value    = fn_sanitizeUrl(savedUrl);
-                if (savedKey)    document.getElementById('cfg_sb_key').value    = savedKey.trim();
-                if (savedGemini) document.getElementById('cfg_gemini_key').value = savedGemini.trim();
+                if (savedUrl)    document.getElementById('cfg_sb_url').value    = savedUrl;
+                if (savedKey)    document.getElementById('cfg_sb_key').value    = savedKey;
+                if (savedGemini) document.getElementById('cfg_gemini_key').value = savedGemini;
 
-                if (!savedUrl || !savedKey) {
+                if (!savedUrl || !savedKey || savedUrl.length < 10 || savedKey.length < 20) {
                     document.getElementById('cred-warning').classList.remove('hidden');
                     setStatusBadge('idle');
-                    printLog("Bu cihazda kayıtlı kimlik bilgisi yok. Alanları doldurun.", 'error');
+                    printLog("Hafızada kayıtlı kimlik bilgisi yok veya yeni bir adrestesiniz. Lütfen alanları doldurun.", 'info');
                 } else {
                     initSupabase();
                 }
@@ -229,9 +221,19 @@
         function saveSettings() {
             try {
                 const rawUrl = document.getElementById('cfg_sb_url').value;
-                localStorage.setItem('sb_url',    fn_sanitizeUrl(rawUrl));
-                localStorage.setItem('sb_key',    document.getElementById('cfg_sb_key').value.trim());
-                localStorage.setItem('gemini_key', document.getElementById('cfg_gemini_key').value.trim());
+                const rawKey = document.getElementById('cfg_sb_key').value;
+                const rawGemini = document.getElementById('cfg_gemini_key').value;
+
+                const cleanUrl = fn_sanitizeUrl(rawUrl);
+
+                localStorage.setItem('sb_url',    cleanUrl);
+                localStorage.setItem('sb_key',    rawKey.trim());
+                localStorage.setItem('gemini_key', rawGemini.trim());
+
+                document.getElementById('cfg_sb_url').value = cleanUrl;
+                document.getElementById('cfg_sb_key').value = rawKey.trim();
+                document.getElementById('cfg_gemini_key').value = rawGemini.trim();
+
                 initSupabase();
                 printLog("Ayarlar başarıyla bu tarayıcıya kaydedildi.", 'success');
                 alert("Bağlantı anahtarları başarıyla bu cihaza kaydedildi!");
@@ -244,7 +246,7 @@
 
         async function testSupabaseConnection() {
             printLog("Supabase veri yolu test ediliyor...", 'info');
-            initSupabase(true);
+            initSupabase();
             if (!supabaseClient) {
                 printLog("HATA: Supabase parametreleri eksik veya yetersiz!", 'error');
                 return alert("Lütfen önce Supabase URL ve Anon Key alanlarını doldurun.");
@@ -267,7 +269,6 @@
         // ── GEMİNİ MOTORU — OPTİMİZE EDİLMİŞ VERİ AKIŞI ─────────────────────────────
 
         async function executeGeminiRequest(bodyPayload, key) {
-            // Kararlı çalışan ve yüksek kotalı ana tüneller listelendi
             const MODELS = [
                 'gemini-1.5-flash',
                 'gemini-1.5-pro'
@@ -276,7 +277,7 @@
             const BASE_WAIT_MS = 2000;
             let lastError = null;
 
-            for (const model of models) {
+            for (const model of MODELS) {
                 for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
                     try {
                         printLog(`[AI] ${model} — deneme ${attempt}/${MAX_ATTEMPTS_PER_MODEL}`, 'info');
@@ -394,10 +395,9 @@
                     // %80 TOKEN TASARRUFU SAĞLAYAN YENİ FİLTRE DÖNGÜSÜ
                     rows.forEach((row, index) => {
                         if (row?.length > 0) {
-                            // Satırdaki tamamen boş ve null olan tüm hücreleri diziden atıyoruz
                             const filteredCells = row
                                 .map(c => c == null ? "" : String(c).trim())
-                                .filter(c => c !== ""); // Boş kolon kirliliği tamamen elenir
+                                .filter(c => c !== ""); 
                             
                             if (filteredCells.length > 0) {
                                 optimizedText += `S${index + 1}: ${filteredCells.join(" | ")}\n`;
@@ -428,7 +428,7 @@
         // ── AI ANALİZ + KAYDET ───────────────────────────────────────────────
 
         async function sendToAIAndSave() {
-            if (!supabaseClient) initSupabase(true);
+            initSupabase();
 
             const GEMINI_API_KEY = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!supabaseClient || !GEMINI_API_KEY) {
@@ -471,7 +471,6 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             try {
                 printLog("2/5: Optimize edilmiş veriler tünel üzerinden aktarılıyor...", 'info');
                 
-                // HARDWARE JSON MODE AKTİF EDİLDİ (Hızlı ve akıcı yanıt için)
                 const result = await executeGeminiRequest({ 
                     contents: [
                         { parts: [{ text: aiPrompt }, { text: `Ham Veri:\n${rawExcelTextDump}` }] }
@@ -535,7 +534,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             } catch (err) {
                 printLog("✕ İŞLEM DURDURULDU: " + err.message, 'error');
                 alert("İŞLEM DURDURULDU:\n" + err.message);
-            } finaly {
+            } finally {
                 btn.disabled = false; btn.style.opacity = "1";
                 btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
                 setStatusBadge('connected');
@@ -570,7 +569,7 @@ Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
             const term = document.getElementById('search_poz').value.trim();
             if (!term) return alert("Lütfen bir poz kodu veya imalat adı girin.");
 
-            if (!supabaseClient) initSupabase(true);
+            if (!supabaseClient) initSupabase();
             if (!supabaseClient) return alert("Supabase bağlantısı yok.\n\nLütfen üst kısımdaki Supabase URL ve Key alanlarını doldurun.");
 
             printLog(`"${term}" için poz/imalat adı araması yapılıyor...`, 'info');
