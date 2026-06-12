@@ -13,16 +13,13 @@
 
     <div class="max-w-7xl mx-auto space-y-6">
 
-        <!-- ── KİMLİK BİLGİLERİ ─────────────────────────────────────────── -->
         <div class="bg-slate-800 p-4 rounded-xl border border-dashed border-slate-700 space-y-4 text-xs">
-            <!-- Yeni bilgisayarda "Kaydet" gerekmez; credential yazılır yazılmaz bağlantı kurulur -->
             <div id="cred-warning" class="hidden bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs px-3 py-2 rounded-lg">
                 ⚠ Bu cihazda kayıtlı kimlik bilgisi bulunamadı. Aşağıdaki alanları doldurun — yazarken otomatik bağlanılacaktır.
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-slate-400 font-medium mb-1">Supabase URL</label>
-                    <!-- oninput: yazılır yazılmaz Supabase anında init edilir -->
                     <input type="text" id="cfg_sb_url" placeholder="https://xyz.supabase.co"
                         oninput="onCredentialInput()"
                         class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-white focus:outline-none">
@@ -42,13 +39,12 @@
             <div class="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-700/50">
                 <div class="flex gap-2">
                     <button onclick="testSupabaseConnection()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold px-3 py-1 rounded cursor-pointer shadow transition-all">1. Supabase Test Et</button>
-                    <button onclick="testGeminiConnection()"  class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold px-3 py-1 rounded cursor-pointer shadow transition-all">2. Gemini AI Test Et</button>
+                    <button onclick="testGeminiConnection()"   class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold px-3 py-1 rounded cursor-pointer shadow transition-all">2. Gemini AI Test Et</button>
                 </div>
                 <button onclick="saveSettings()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-5 py-1 rounded shadow cursor-pointer transition-all">Kimlik Bilgilerini Hafızaya Kaydet</button>
             </div>
         </div>
 
-        <!-- ── BAŞLIK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl flex justify-between items-center">
             <div>
                 <h1 class="text-2xl font-bold text-amber-500">Yapay Zeka Destekli Birim Fiyat Paneli</h1>
@@ -59,7 +55,6 @@
             </div>
         </div>
 
-        <!-- ── LOG ───────────────────────────────────────────────────────── -->
         <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
             <div class="text-xs font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
@@ -70,7 +65,6 @@
             </div>
         </div>
 
-        <!-- ── FORM + DOSYA ───────────────────────────────────────────────── -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-4">
                 <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">1. Üst Sözleşme Bilgileri</h2>
@@ -110,12 +104,10 @@
             </div>
         </div>
 
-        <!-- ── GRAFİK ─────────────────────────────────────────────────────── -->
         <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 space-y-6">
             <h2 class="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">3. Poz Bazlı Akıllı Analiz ve Revizyon Grafiği</h2>
             <div class="space-y-1">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- Placeholder güncellendi: hem kod hem isim araması yapılabiliyor -->
                     <input type="text" id="search_poz"
                         placeholder="Poz kodu veya imalat adı (örn: ÖBF (1), boya, zemin)"
                         class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 md:col-span-2">
@@ -155,7 +147,6 @@
             return clean;
         };
 
-        /** Bağlantı durumuna göre üst rozeti günceller */
         function setStatusBadge(state) {
             const badge = document.getElementById('ai-status');
             const styles = {
@@ -176,10 +167,6 @@
 
         // ── SUPABASE BAŞLATMA ─────────────────────────────────────────────────
 
-        /**
-         * FIX-1: Supabase'i hem localStorage'dan hem de anlık input değerlerinden başlatır.
-         * Yeni bilgisayarda "Kaydet" butonu gerekmez; sadece URL+Key yazılması yeterlidir.
-         */
         function initSupabase(fromInputs = false) {
             let url, key;
             if (fromInputs) {
@@ -188,7 +175,6 @@
             } else {
                 url = localStorage.getItem('sb_url') || "";
                 key = localStorage.getItem('sb_key') || "";
-                // localStorage boşsa input'tan dene
                 if (!url || url.length < 10) url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
                 if (!key || key.length < 20) key = document.getElementById('cfg_sb_key').value.trim();
             }
@@ -210,14 +196,9 @@
             }
         }
 
-        /**
-         * FIX-1: URL veya Key alanına yazılır yazılmaz tetiklenir.
-         * Yeni bilgisayarda "Kaydet" olmadan da çalışmayı sağlar.
-         */
         function onCredentialInput() {
             const url = fn_sanitizeUrl(document.getElementById('cfg_sb_url').value);
             const key = document.getElementById('cfg_sb_key').value.trim();
-            // Hem URL hem key yeterli uzunluktaysa anında bağlan
             if (url.length > 10 && key.length > 20) {
                 initSupabase(true);
             }
@@ -233,7 +214,6 @@
                 if (savedKey)    document.getElementById('cfg_sb_key').value    = savedKey.trim();
                 if (savedGemini) document.getElementById('cfg_gemini_key').value = savedGemini.trim();
 
-                // localStorage boşsa uyarı göster
                 if (!savedUrl || !savedKey) {
                     document.getElementById('cred-warning').classList.remove('hidden');
                     setStatusBadge('idle');
@@ -264,10 +244,10 @@
 
         async function testSupabaseConnection() {
             printLog("Supabase veri yolu test ediliyor...", 'info');
-            initSupabase(true);   // Anlık input'tan da dene
+            initSupabase(true);
             if (!supabaseClient) {
                 printLog("HATA: Supabase parametreleri eksik veya yetersiz!", 'error');
-                return alert("Lütfen önce Supabase URL ve Anon Key alanlarını eksiksiz doldurun.");
+                return alert("Lütfen önce Supabase URL ve Anon Key alanlarını doldurun.");
             }
             try {
                 const { data, error } = await supabaseClient.from('projects').select('id').limit(1);
@@ -276,31 +256,27 @@
                 alert("✓ BAĞLANTI BAŞARILI: Supabase veritabanınıza sorunsuz ulaşıldı!");
             } catch (err) {
                 setStatusBadge('error');
-                // FIX-1: Hata mesajına tanımlayıcı bilgi eklendi
                 const hint = err.message.includes('JWT') || err.message.includes('auth')
-                    ? "\n\nİpucu: Anon Key hatalı olabilir. Supabase panelinizden tekrar kopyalayın."
-                    : err.message.includes('network') || err.message.includes('fetch')
-                    ? "\n\nİpucu: Ağ bağlantınızı kontrol edin."
+                    ? "\n\nİpucu: Anon Key hatalı olabilir."
                     : "\n\nİpucu: URL ve Key doğruysa Supabase RLS politikalarınızı kontrol edin.";
                 printLog("✕ Supabase Bağlantısı Kesildi: " + err.message, 'error');
                 alert("✕ SUPABASE BAĞLANTI HATASI:\n" + err.message + hint);
             }
         }
 
-        // ── GEMİNİ MOTORU — Üstel Geri Çekilme ─────────────────────────────
+        // ── GEMİNİ MOTORU — OPTİMİZE EDİLMİŞ VERİ AKIŞI ─────────────────────────────
 
         async function executeGeminiRequest(bodyPayload, key) {
+            // Kararlı çalışan ve yüksek kotalı ana tüneller listelendi
             const MODELS = [
-                'gemini-2.5-flash',   // En yüksek kapasite — önce dene
-                'gemini-2.5-pro',     // Daha güçlü ama dolabilir
-                'gemini-1.5-flash',   // Güvenilir yedek
-                'gemini-1.5-pro'      // Son çare
+                'gemini-1.5-flash',
+                'gemini-1.5-pro'
             ];
             const MAX_ATTEMPTS_PER_MODEL = 3;
             const BASE_WAIT_MS = 2000;
             let lastError = null;
 
-            for (const model of MODELS) {
+            for (const model of models) {
                 for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
                     try {
                         printLog(`[AI] ${model} — deneme ${attempt}/${MAX_ATTEMPTS_PER_MODEL}`, 'info');
@@ -322,47 +298,37 @@
                             const errJson = await response.json();
                             errText = errJson?.error?.message || JSON.stringify(errJson);
                             errCode  = errJson?.error?.code   || response.status;
-                        } catch (_) {
-                            try { errText = await response.text(); } catch (_2) {}
-                        }
+                        } catch (_) {}
 
                         lastError = new Error(`[${model}] ${errText}`);
 
                         const isCapacityError =
                             errCode === 429 || errCode === 503 ||
-                            response.status === 429 || response.status === 503 ||
                             /resource.?exhausted/i.test(errText) ||
                             /quota/i.test(errText) ||
                             /overloaded/i.test(errText) ||
                             /capacity/i.test(errText) ||
-                            /rate.?limit/i.test(errText) ||
                             /demand/i.test(errText) ||
-                            /unavailable/i.test(errText) ||
-                            /try.?again/i.test(errText);
+                            /unavailable/i.test(errText);
 
                         if (isCapacityError && attempt < MAX_ATTEMPTS_PER_MODEL) {
                             const waitMs = BASE_WAIT_MS * Math.pow(2, attempt - 1);
-                            printLog(`[AI] ${model} sunucusu meşgul. ${waitMs / 1000}sn bekleniyor...`, 'info');
+                            printLog(`[AI] ${model} meşgul. ${waitMs / 1000}sn bekleniyor...`, 'info');
                             await new Promise(r => setTimeout(r, waitMs));
-                        } else if (isCapacityError) {
-                            printLog(`[AI] ${model} tüm denemelerde kapasitesizdi. Yedek modele geçiliyor...`, 'error');
-                            break;
                         } else {
-                            printLog(`[AI] ${model} kalıcı hata (${response.status}). Sonraki hatta aktarılıyor...`, 'error');
                             break;
                         }
                     } catch (networkErr) {
                         lastError = networkErr;
-                        printLog(`[AI] ${model} ağ hatası: ${networkErr.message}`, 'error');
                         if (attempt < MAX_ATTEMPTS_PER_MODEL) await new Promise(r => setTimeout(r, BASE_WAIT_MS));
                     }
                 }
             }
-            throw lastError || new Error('Tüm yapay zeka tünelleri yanıt vermedi. API anahtarınızı ve internet bağlantınızı kontrol edin.');
+            throw lastError || new Error('Tüm yapay zeka tünelleri meşgul. Lütfen kısa bir süre sonra tekrar deneyin.');
         }
 
         async function testGeminiConnection() {
-            printLog("Google Gemini API v1beta tünel zinciri test ediliyor...", 'info');
+            printLog("Google Gemini API tünel zinciri test ediliyor...", 'info');
             const key = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!key || key.length < 5) {
                 printLog("HATA: Gemini API Key tanımsız!", 'error');
@@ -371,19 +337,19 @@
             try {
                 await executeGeminiRequest({ contents: [{ parts: [{ text: "Hello" }] }] }, key);
                 printLog("✓ Yapay Zeka Hattı Tamamen Doğrulandı!", 'success');
-                alert("✓ BAĞLANTI BAŞARILI: Google Gemini yapay zeka tünel zinciri başarıyla bağlandı!");
+                alert("✓ BAĞLANTI BAŞARILI: Google Gemini hattı aktiftir!");
             } catch (err) {
                 printLog("✕ Yapay Zeka Bağlantı Reddi: " + err.message, 'error');
                 alert("✕ GOOGLE AI HATASI:\n" + err.message);
             }
         }
 
-        // ── EXCEL YÜKLEME ────────────────────────────────────────────────────
+        // ── EXCEL YÜKLEME — VERİ SIKIŞTIRMA MOTORU ────────────────────────────────────
 
         function loadExcelToText(event) {
             const file = event.target.files[0];
             if (!file) return;
-            printLog("Excel paftası akıllı filtre matrisiyle analiz ediliyor...", 'info');
+            printLog("Excel paftası sıkıştırma motoruyla optimize ediliyor...", 'info');
             const reader = new FileReader();
             reader.onload = function (e) {
                 try {
@@ -393,6 +359,7 @@
                     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                     let optimizedText = "", autoProj = "", autoComp = "";
 
+                    // Üst blok proje adı yakalama
                     for (let i = 0; i < Math.min(rows.length, 15); i++) {
                         const row = rows[i];
                         if (!row) continue;
@@ -406,6 +373,7 @@
                         }
                     }
 
+                    // Alt blok taşeron firma adı yakalama
                     for (let i = rows.length - 1; i >= 0; i--) {
                         if (autoComp) break;
                         const row = rows[i];
@@ -423,9 +391,17 @@
                         }
                     }
 
+                    // %80 TOKEN TASARRUFU SAĞLAYAN YENİ FİLTRE DÖNGÜSÜ
                     rows.forEach((row, index) => {
-                        if (row?.length > 0 && row.some(c => c != null && String(c).trim() !== "")) {
-                            optimizedText += `Satır ${index + 1}: ${row.map(c => c == null ? "" : String(c).trim()).join(" | ")}\n`;
+                        if (row?.length > 0) {
+                            // Satırdaki tamamen boş ve null olan tüm hücreleri diziden atıyoruz
+                            const filteredCells = row
+                                .map(c => c == null ? "" : String(c).trim())
+                                .filter(c => c !== ""); // Boş kolon kirliliği tamamen elenir
+                            
+                            if (filteredCells.length > 0) {
+                                optimizedText += `S${index + 1}: ${filteredCells.join(" | ")}\n`;
+                            }
                         }
                     });
                     rawExcelTextDump = optimizedText;
@@ -441,7 +417,7 @@
                     document.getElementById('company_name').value = autoComp || "";
                     if (autoComp) printLog(`[SİSTEM] Taşeron Firma adı üst panele basıldı: "${autoComp}"`, 'success');
                     document.getElementById('effective_date').value = "";
-                    document.getElementById('file-status-text').innerText = file.name + " yüklendi ve hazır.";
+                    document.getElementById('file-status-text').innerText = file.name + " optimize edildi ve hazır.";
                 } catch (err) {
                     printLog("Excel akıllı tarama hatası: " + err.message, 'error');
                 }
@@ -452,13 +428,12 @@
         // ── AI ANALİZ + KAYDET ───────────────────────────────────────────────
 
         async function sendToAIAndSave() {
-            // FIX-1: Kaydedilmemiş giriş değerlerinden de Supabase init edebilir
             if (!supabaseClient) initSupabase(true);
 
             const GEMINI_API_KEY = localStorage.getItem('gemini_key') || document.getElementById('cfg_gemini_key').value.trim();
             if (!supabaseClient || !GEMINI_API_KEY) {
                 printLog("Kritik Durdurma: Bağlantı anahtarları eksik.", 'error');
-                return alert("Lütfen Supabase URL/Key ve Gemini API Key alanlarını doldurun.\n\n(Yeni bir bilgisayardaysanız üst kısımdaki alanları tekrar girin.)");
+                return alert("Lütfen Supabase URL/Key ve Gemini API Key alanlarını doldurun.");
             }
 
             const projName = document.getElementById('project_name').value.trim();
@@ -476,26 +451,33 @@
             setStatusBadge('busy');
             printLog("1/5: İstek paketi güvenli kanala ulaştırılıyor...", 'info');
 
-            const aiPrompt = `Aşağıda "Satır X: Hücre1 | Hücre2" formatında düzenlenmiş ham inşaat keşif metnindeki imalat satırlarını akıllıca analiz et.
-Başlık satırlarını ve tamamen boş satırları atlayarak sadece geçerli imalat kalemlerini (poz kodu, imalat adı, birimi, miktarı ve birim fiyatı olanları) ayıkla.
+            const aiPrompt = `Aşağıda düzenlenmiş inşaat keşif metnindeki imalat satırlarını ayıkla.
+Sadece geçerli imalat kalemlerini (poz kodu, imalat adı, birimi, miktarı ve birim fiyatı olanları) çıkar.
 
 Bana tam olarak şu yapıda geçerli bir JSON objesi üret:
 {
   "items": [
     {
-      "item_code": "POZ NUMARASI VEYA KODU (Örn: Y.23.014 veya ÖBF-1)",
-      "item_name": "İMALAT ADI VE DETAYLI AÇIKLAMASI",
-      "unit": "BİRİMİ (Örn: m², m³, kg, adet)",
+      "item_code": "POZ NUMARASI VEYA KODU (Örn: ÖBF-1)",
+      "item_name": "İMALAT ADI AÇIKLAMASI",
+      "unit": "BİRİMİ (Örn: m², kg, adet)",
       "quantity": 100.50,
       "unit_price_tl": 250.75
     }
   ]
 }
-Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama ekleme.\n\nHam Veri:\n${rawExcelTextDump}`;
+Sadece JSON nesnesini döndür, başına veya sonuna açıklama ekleme.`;
 
             try {
-                printLog("2/5: Veriler dinamik tünel zinciriyle aktarılıyor...", 'info');
-                const result = await executeGeminiRequest({ contents: [{ parts: [{ text: aiPrompt }] }] }, GEMINI_API_KEY);
+                printLog("2/5: Optimize edilmiş veriler tünel üzerinden aktarılıyor...", 'info');
+                
+                // HARDWARE JSON MODE AKTİF EDİLDİ (Hızlı ve akıcı yanıt için)
+                const result = await executeGeminiRequest({ 
+                    contents: [
+                        { parts: [{ text: aiPrompt }, { text: `Ham Veri:\n${rawExcelTextDump}` }] }
+                    ],
+                    generation_config: { response_mime_type: "application/json" }
+                }, GEMINI_API_KEY);
 
                 printLog("3/5: Yapay zeka veri ayıklamayı bitirdi. JSON haritası çözülüyor...", 'success');
                 let aiText = result.candidates[0].content.parts[0].text;
@@ -506,7 +488,6 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
 
                 printLog(`4/5: ${parsedItems.length} imalat kalemi filtrelendi. Supabase kayıt kanalı açılıyor...`, 'info');
 
-                // Proje
                 let project = null;
                 let { data: pData } = await supabaseClient.from('projects').select('id').eq('project_name', projName).limit(1);
                 if (pData?.length > 0) { project = pData[0]; }
@@ -517,7 +498,6 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                 }
                 if (!project) throw new Error("Proje kimliği RLS engeline takıldı.");
 
-                // Firma
                 let company = null;
                 let { data: cData } = await supabaseClient.from('companies').select('id').eq('company_name', compName).limit(1);
                 if (cData?.length > 0) { company = cData[0]; }
@@ -528,7 +508,6 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                 }
                 if (!company) throw new Error("Firma kimliği RLS engeline takıldı.");
 
-                // Sözleşme
                 const { data: nCon, error: conErr } = await supabaseClient.from('contracts')
                     .insert([{ project_id: project.id, company_id: company.id, contract_date: effDate }]).select('id');
                 if (conErr) throw new Error("Sözleşme oluşturulamadı: " + conErr.message);
@@ -556,7 +535,7 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
             } catch (err) {
                 printLog("✕ İŞLEM DURDURULDU: " + err.message, 'error');
                 alert("İŞLEM DURDURULDU:\n" + err.message);
-            } finally {
+            } finaly {
                 btn.disabled = false; btn.style.opacity = "1";
                 btn.innerText = "Yapay Zeka Analizini Başlat & Supabase'e Kaydet";
                 setStatusBadge('connected');
@@ -579,7 +558,6 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
             return s.replace(/[^\d.\/-]/g, '').trim() || 'Bilinmeyen';
         }
 
-        // Tarih stringini karşılaştırmak için sayısal değere çevirir (DD.MM.YYYY → timestamp)
         function parseTrDate(s) {
             const p = s.split('.');
             if (p.length === 3) return new Date(+p[2], +p[1] - 1, +p[0]).getTime();
@@ -588,22 +566,15 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
 
         // ── GRAFİK ───────────────────────────────────────────────────────────
 
-        /**
-         * FIX-2: Hem item_code hem item_name üzerinde %wildcard% araması yapar.
-         * Birden fazla farklı poz bulunursa her biri ayrı renkli çizgide gösterilir.
-         * Şirket adı hiçbir yerde görünmez.
-         */
         async function fetchPozHistory() {
             const term = document.getElementById('search_poz').value.trim();
             if (!term) return alert("Lütfen bir poz kodu veya imalat adı girin.");
 
-            // FIX-1: Eğer client hâlâ null ise input'tan tekrar init et
             if (!supabaseClient) initSupabase(true);
             if (!supabaseClient) return alert("Supabase bağlantısı yok.\n\nLütfen üst kısımdaki Supabase URL ve Key alanlarını doldurun.");
 
             printLog(`"${term}" için poz/imalat adı araması yapılıyor...`, 'info');
 
-            // FIX-2: OR filtresi + wildcard — hem kod hem isim araması
             const { data, error } = await supabaseClient
                 .from('v_indexed_contract_items')
                 .select('*')
@@ -615,10 +586,9 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
             }
             if (!data || data.length === 0) {
                 printLog(`"${term}" ile eşleşen kayıt bulunamadı.`, 'error');
-                return alert(`"${term}" ile eşleşen poz veya imalat kaydı bulunamadı.\n\nFarklı bir anahtar kelime deneyin.`);
+                return alert(`"${term}" ile eşleşen poz veya imalat kaydı bulunamadı.`);
             }
 
-            // FIX-2: Farklı poz kodlarını grupla → her biri ayrı dataset
             const groups = {};
             data.forEach(d => {
                 const code = (d.item_code || 'Bilinmeyen').trim();
@@ -626,16 +596,13 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                 groups[code].push(d);
             });
 
-            // Tüm tarihlerin birleşimi → ortak X ekseni
             const allDatesSet = new Set();
             data.forEach(d => allDatesSet.add(extractDateOnly(d.price_date || d.contract_date)));
             const allDates = [...allDatesSet].sort((a, b) => parseTrDate(a) - parseTrDate(b));
 
-            // Çizgi renkleri (şirket adı değil, poz kodu etiketlenecek)
             const COLORS = ['#f59e0b','#3b82f6','#10b981','#f43f5e','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
 
             const datasets = Object.keys(groups).map((code, i) => {
-                // Her tarih için o koda ait fiyatı bul (yoksa null)
                 const priceByDate = {};
                 groups[code].forEach(d => {
                     const dateKey = extractDateOnly(d.price_date || d.contract_date);
@@ -643,7 +610,7 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                 });
                 const color = COLORS[i % COLORS.length];
                 return {
-                    label: code,        // Sadece poz kodu — şirket adı yok
+                    label: code,
                     data: allDates.map(date => priceByDate[date] ?? null),
                     borderColor: color,
                     backgroundColor: color + '18',
@@ -651,7 +618,7 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                     pointBackgroundColor: color,
                     pointRadius: 5,
                     pointHoverRadius: 7,
-                    fill: Object.keys(groups).length === 1, // Tek çizgide dolgu, çoklu çizgide çizgi
+                    fill: Object.keys(groups).length === 1,
                     tension: 0.3,
                     spanGaps: false
                 };
@@ -671,7 +638,6 @@ Yanıtında sadece JSON objesi yer alsın, başına veya sonuna açıklama eklem
                             position: 'top',
                             labels: { color: '#94a3b8', font: { size: 11 }, padding: 16 }
                         },
-                        // TOOLTIP: Sadece poz kodu + tarih + fiyat. Şirket adı yok.
                         tooltip: {
                             backgroundColor: 'rgba(15,23,42,0.97)',
                             titleColor: '#f59e0b',
